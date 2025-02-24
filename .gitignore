@@ -1,0 +1,21 @@
+# Ignorar todos los archivos .log
+*.log
+
+# Ignorar todos los archivos .json
+*.json
+
+
+# Ignorar archivos de entorno
+.env
+
+# Ignorar directorios de dependencias
+node_modules/
+vendor/
+
+# Ignorar archivos de sistema
+.DS_Store
+Thumbs.db
+
+# Ignorar archivos de IDE
+.idea/
+.vscode/y

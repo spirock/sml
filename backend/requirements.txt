@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+motor  # Cliente asíncrono para MongoDB
+pydantic
+watchdog  # Para monitoreo de logs en tiempo real
+scikit-learn
+pandas
+numpy
+

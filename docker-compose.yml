@@ -1,0 +1,84 @@
+version: "3.8"
+
+services:
+  database:
+    image: mongo:6
+    container_name: mongodb
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: user
+      MONGO_INITDB_ROOT_PASSWORD: password
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodata:/data/db
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017 --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - suricata_network
+
+  mongo-express:
+    image: mongo-express
+    container_name: mongo_express
+    restart: always
+    depends_on:
+      - database
+    ports:
+      - "8081:8081"
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: user
+      ME_CONFIG_MONGODB_ADMINPASSWORD: password
+      ME_CONFIG_MONGODB_URL: mongodb://user:password@database:27017/
+    networks:
+      - suricata_network
+
+  suricata:
+    image: jasonish/suricata:latest
+    container_name: suricata
+    restart: unless-stopped
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+      - SYS_NICE
+    network_mode: host
+    #networks:
+    #  - suricata_network
+    volumes:
+      - ./suricata/suricata.yaml:/etc/suricata/suricata.yaml # Archivo de configuración
+      - ./suricata/rules:/var/lib/suricata/rules # Reglas personalizadas
+      - ./suricata/logs:/var/log/suricata # Logs de Suricata
+    command: ["suricata", "-i", "eth0"]
+    entrypoint:
+      ["/bin/bash", "-c", "ip link set dev eth0 mtu 1500  && suricata -i eth0"]
+
+  fastapi:
+    build: ./backend
+    container_name: fastapi
+    restart: always
+    depends_on:
+      database:
+        condition: service_healthy
+      suricata:
+        condition: service_started
+    ports:
+      - "8000:8000"
+    environment:
+      MONGO_URI: mongodb://user:password@database:27017
+    volumes:
+      - ./suricata/logs:/var/log/suricata # Para leer logs en tiempo real
+    networks:
+      - suricata_network
+
+networks:
+  suricata_network:
+    driver: bridge
+    driver_opts:
+      com.docker.network.enable_ipv6: "false"
+      com.docker.network.driver.mtu: 1500 # Configurar el MTU de la red
+
+volumes:
+  mongodata:
+  suricata_logs:
