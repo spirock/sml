@@ -5,6 +5,12 @@
 echo "Esperando a que MongoDB esté disponible..."
 /app/wait-for-it.sh database:27017 --timeout=30 --strict -- echo "MongoDB está listo."
 
+# Ejecutar init_db() desde db_connection.py para crear la base de datos y colección
+echo "📂 Verificando la base de datos en MongoDB..."
+python -c 'import asyncio; from db_connection import init_db; asyncio.run(init_db())'
+echo "✅ Base de datos y colección verificadas."
+
+
 # Iniciar monitoreo de Suricata en segundo plano
 python suricata_to_mongo.py &
 
