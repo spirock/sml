@@ -22,7 +22,7 @@ if [ ! -f "suricata_preprocessed.csv" ]; then
     # Esperar hasta que el archivo sea generado
     while [ ! -f "suricata_preprocessed.csv" ]; do
         echo "Esperando a que suricata_preprocessed.csv sea generado..."
-        sleep 5
+        sleep 10
     done
 fi
 
