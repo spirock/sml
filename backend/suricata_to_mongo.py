@@ -1,23 +1,11 @@
 import json
 import asyncio
 import time
-from motor.motor_asyncio import AsyncIOMotorClient
-
-# Configuración de MongoDB
-MONGO_URI = "mongodb://user:password@database:27017"
-DB_NAME = "suricata"
-COLLECTION_NAME = "events"
+from db_connection import db  # Importar la conexión a MongoDB
 
 # Ruta del log de Suricata
 LOG_FILE = "/var/log/suricata/eve.json"
 
-async def connect_to_mongo():
-    """Establece la conexión a MongoDB y devuelve la colección."""
-    print("📡 Conectando a MongoDB...")
-    client = AsyncIOMotorClient(MONGO_URI)
-    db = client[DB_NAME]
-    collection = db[COLLECTION_NAME]
-    return client, collection
 
 async def read_last_event():
     """Lee el último evento de eve.json, si existe."""
@@ -35,6 +23,7 @@ async def read_last_event():
 async def insert_event(collection, event_data):
     """Inserta un evento en MongoDB."""
     try:
+        collection = db["events"]
         await collection.insert_one(event_data)
         print(f"✅ Evento insertado en MongoDB: {event_data}")
     except Exception as e:
@@ -43,11 +32,10 @@ async def insert_event(collection, event_data):
 async def main():
     """Bucle principal para monitorear eve.json e insertar eventos en MongoDB."""
     print("🚀 Iniciando monitoreo de Suricata...")
-    client, collection = await connect_to_mongo()
+    await db.list_collection_names()  # Asegurar conexión inicial
 
     last_timestamp = None
     while True:
-        
         print("🔁 Revisando el archivo eve.json...", flush=True)
         event = await read_last_event()
         if event and event.get("event_type") == "alert":
@@ -66,13 +54,13 @@ async def main():
                     "alert.signature": event.get("alert", {}).get("signature", "Sin firma"),
                     "timestamp": event.get("timestamp", "Desconocido")
                 }
-                await insert_event(collection, event_data)
+                await insert_event(event_data)
         else:
             print("⚠ Evento ignorado (no es una alerta).")
 
         await asyncio.sleep(5)  # Espera 5 segundos antes de volver a comprobar
 
-    client.close()
+
 
 if __name__ == "__main__":
     asyncio.run(main())
