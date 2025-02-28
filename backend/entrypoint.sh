@@ -37,6 +37,10 @@ fi
 
 # Ejecutar el script de monitoreo de logs en segundo plano
 python log_watcher.py &
-# Iniciar la aplicación FastAPI
+
+
+# ===========================
+# 🚀 **Iniciar FastAPI**
+# ===========================
 echo "Iniciando FastAPI..."
 exec uvicorn main:app --host 0.0.0.0 --port 8000 --reload

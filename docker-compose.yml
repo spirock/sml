@@ -70,6 +70,19 @@ services:
     networks:
       - suricata_network
 
+  cron:
+    build: ./cron
+    container_name: cron
+    restart: always
+    depends_on:
+      - fastapi
+    volumes:
+      - ./suricata/rules:/var/lib/suricata/rules # Para guardar reglas generadas
+      - ./logs:/var/log # Para logs de cron
+      - ./backend:/app # Para acceder a generate_rules.py
+    networks:
+      - suricata_network
+
 networks:
   suricata_network:
     driver: bridge

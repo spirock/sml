@@ -2166,7 +2166,7 @@ default-rule-path: /var/lib/suricata/rules
 
 rule-files:
   - suricata.rules
-  - ml.rules
+  - sml.rules
 
 ##
 ## Auxiliary configuration files.
