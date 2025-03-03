@@ -21,9 +21,11 @@ async def get_logs():
         return logs
     except Exception as e:
         return {"error": str(e)}
+    
+MODEL_PATH = "/app/models/isolation_forest_model.pkl"
 
 # Cargar el modelo entrenado
-model = joblib.load("isolation_forest_model.pkl")
+model = joblib.load(MODEL_PATH)
 
 
 @router.post("/predict")

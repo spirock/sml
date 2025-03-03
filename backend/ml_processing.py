@@ -2,26 +2,34 @@ from motor.motor_asyncio import AsyncIOMotorClient
 import pandas as pd
 import numpy as np
 import asyncio
-
-# Conexión a MongoDB
-MONGO_URI = "mongodb://user:password@database:27017"
-DB_NAME = "suricata"
+from db_connection import db  # Importar la conexión a MongoDB
 COLLECTION_NAME = "events"
 
+
+
 async def fetch_suricata_data():
-    print("Conectando a MongoDB...")
-    client = AsyncIOMotorClient(MONGO_URI)
-    db = client[DB_NAME]
     collection = db[COLLECTION_NAME]
     
     cursor = collection.find({}, {"_id": 0})  # Excluir _id para evitar problemas
     events = await cursor.to_list(length=1000)  # Tomar hasta 1000 eventos
     
-    client.close()
+
     
     print(f"Se encontraron {len(events)} eventos en MongoDB.")
     return events
 
+def ip_to_int(ip):
+    """Convierte una dirección IP en formato string a un número entero."""
+    try:
+        if isinstance(ip, str) and ip.count('.') == 3:  # Verifica que sea una IP válida
+            return sum([int(num) << (8 * i) for i, num in enumerate(reversed(ip.split('.')))])
+        else:
+            print(f"⚠ Advertencia: IP inválida detectada -> {ip}")
+            return 0  # Asignar 0 si la IP es inválida
+    except ValueError:
+        print(f"⚠ Error: No se pudo convertir la IP -> {ip}")
+        return 0
+    
 def preprocess_data(events):
     df = pd.DataFrame(events)
 
@@ -42,15 +50,15 @@ def preprocess_data(events):
 
     df = df[selected_columns].copy()
 
-    # Convertir direcciones IP a valores numéricos
-    df["src_ip"] = df["src_ip"].apply(lambda x: sum([int(num) << (8 * i) for i, num in enumerate(reversed(x.split('.')))]))
-    df["dest_ip"] = df["dest_ip"].apply(lambda x: sum([int(num) << (8 * i) for i, num in enumerate(reversed(x.split('.')))]))
+    # Convertir direcciones IP a valores numéricos usando ip_to_int()
+    df["src_ip"] = df["src_ip"].apply(ip_to_int)
+    df["dest_ip"] = df["dest_ip"].apply(ip_to_int)
 
     # Reemplazar valores categóricos del protocolo
     df["proto"] = df["proto"].astype("category").cat.codes
 
-    # Normalizar datos numéricos
-    df = (df - df.min()) / (df.max() - df.min())
+    # Normalizar datos numéricos (evita dividir por 0 si todos los valores son iguales)
+    df = (df - df.min()) / (df.max() - df.min()).replace(0, 1)
 
     return df
 

@@ -67,6 +67,8 @@ services:
       MONGO_URI: mongodb://user:password@database:27017
     volumes:
       - ./suricata/logs:/var/log/suricata # Para leer logs en tiempo real
+      - ./logs:/var/log # Nuevo volumen para los logs de FastAPI
+      - ./backend/models:/app/models # 📌 Guardar modelos fuera del contenedor
     networks:
       - suricata_network
 
@@ -80,6 +82,7 @@ services:
       - ./suricata/rules:/var/lib/suricata/rules # Para guardar reglas generadas
       - ./logs:/var/log # Para logs de cron
       - ./backend:/app # Para acceder a generate_rules.py
+      - ./backend/models:/app/models # 📌 Acceder a los modelos desde cron
     networks:
       - suricata_network
 

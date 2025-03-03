@@ -1,7 +1,20 @@
 #!/bin/bash
 
+# Verificar si las dependencias están instaladas
+echo "📦 Verificando instalación de dependencias..."
+pip list | grep joblib > /dev/null
+if [ $? -ne 0 ]; then
+    echo "⏳ joblib no está instalado. Instalando dependencias..."
+    pip install --no-cache-dir -r /app/requirements.txt
+else
+    echo "✅ joblib ya está instalado."
+fi
+
+export PATH="/usr/local/bin:$PATH"
+
 # Archivo de logs para la tarea cron
 LOG_FILE="/var/log/generate_rules_cron.log"
+
 
 # Crear el archivo de log si no existe
 touch $LOG_FILE

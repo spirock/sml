@@ -33,7 +33,7 @@ async def main():
     """Bucle principal para monitorear eve.json e insertar eventos en MongoDB."""
     print("🚀 Iniciando monitoreo de Suricata...")
     await db.list_collection_names()  # Asegurar conexión inicial
-
+    collection = db["events"]  # 🔹 Definir la colección aquí
     last_timestamp = None
     while True:
         print("🔁 Revisando el archivo eve.json...", flush=True)
@@ -54,7 +54,7 @@ async def main():
                     "alert.signature": event.get("alert", {}).get("signature", "Sin firma"),
                     "timestamp": event.get("timestamp", "Desconocido")
                 }
-                await insert_event(event_data)
+                await insert_event(collection,event_data)
         else:
             print("⚠ Evento ignorado (no es una alerta).")
 

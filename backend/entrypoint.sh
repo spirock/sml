@@ -1,9 +1,17 @@
 
 #!/bin/bash
 
+
+
 # Esperar a que MongoDB esté listo
 echo "Esperando a que MongoDB esté disponible..."
 /app/wait-for-it.sh database:27017 --timeout=30 --strict -- echo "MongoDB está listo."
+
+# Crear el archivo de logs si no existe
+LOG_FILE="/var/log/fastapi.log"
+touch $LOG_FILE
+chmod 666 $LOG_FILE  # Permitir escritura
+
 
 # Ejecutar init_db() desde db_connection.py para crear la base de datos y colección
 echo "📂 Verificando la base de datos en MongoDB..."
