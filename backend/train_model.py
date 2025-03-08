@@ -45,5 +45,25 @@ try:
     # Guardar el modelo en la carpeta persistente
     joblib.dump(model, MODEL_PATH)
     print(f"✅ Modelo entrenado y guardado en {MODEL_PATH}")
+
+    # **Evaluación del Modelo**
+    print("\n📊 Evaluando el modelo...")
+
+    # Obtener los puntajes de anomalía
+    anomaly_scores = model.decision_function(df)
+    predictions = model.predict(df)
+
+    # Contar anomalías detectadas
+    total_anomalies = (predictions == -1).sum()
+    print(f"⚠ Total de anomalías detectadas: {total_anomalies} de {len(df)} eventos.")
+
+    # Agregar los resultados al DataFrame
+    df["anomaly_score"] = anomaly_scores
+    df["prediction"] = predictions
+
+    # Guardar resultados en un CSV para análisis
+    result_file = "/app/models/suricata_anomaly_analysis.csv"
+    df.to_csv(result_file, index=False)
+    print(f"✅ Resultados guardados en {result_file}")
 except Exception as e:
     print(f"❌ Error al entrenar el modelo: {e}")

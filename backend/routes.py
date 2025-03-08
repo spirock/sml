@@ -4,11 +4,12 @@ import json
 import pandas as pd
 import joblib
 import numpy as np
-
+from db_connection import db
 router = APIRouter()
 
 LOG_FILE = "/var/log/suricata/eve.json"
-
+#RULES_FILE = "/var/lib/suricata/rules/sml.rules"
+RULES_FILE = "./suricata/rules/sml.rules"
 @router.get("/logs")
 async def get_logs():
     """Lee los logs de Suricata directamente desde el archivo eve.json"""
@@ -45,5 +46,73 @@ async def predict_anomaly(data: dict):
 
         return {"anomaly": bool(prediction[0] == -1)}
 
+    except Exception as e:
+        return {"error": str(e)}
+
+@router.get("/stats")
+async def get_model_stats():
+    """Devuelve estadísticas de las detecciones del modelo."""
+    collection = db["events"]
+    
+    total_events = await collection.count_documents({})
+    anomalies = await collection.count_documents({"prediction": -1})  # Eventos anómalos
+
+    if total_events == 0:
+        return {"message": "No hay datos disponibles."}
+
+    anomaly_percentage = (anomalies / total_events) * 100
+
+    # Obtener las IPs con más anomalías
+    pipeline = [
+        {"$match": {"prediction": -1}},
+        {"$group": {"_id": "$src_ip", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}},
+        {"$limit": 5}
+    ]
+    top_ips = await collection.aggregate(pipeline).to_list(length=5)
+
+    return {
+        "total_events": total_events,
+        "anomalies_detected": anomalies,
+        "anomaly_percentage": anomaly_percentage,
+        "top_anomalous_ips": top_ips
+    }
+
+
+
+@router.get("/rules")
+async def list_rules():
+    """Devuelve la lista de reglas de Suricata."""
+    try:
+        with open(RULES_FILE, "r") as file:
+            rules = file.readlines()
+        return {"rules": rules}
+    except Exception as e:
+        return {"error": str(e)}
+    
+
+@router.put("/rules/{sid}/{status}")
+async def toggle_rule(sid: int, status: str):
+    """Activa o desactiva una regla según su `sid`."""
+    if status not in ["enable", "disable"]:
+        return {"error": "Estado inválido. Usa 'enable' o 'disable'."}
+
+    try:
+        with open(RULES_FILE, "r") as file:
+            lines = file.readlines()
+
+        updated_lines = []
+        for line in lines:
+            if f"sid:{sid};" in line:
+                if status == "disable" and not line.startswith("#"):
+                    line = "#" + line  # Desactivar
+                elif status == "enable":
+                    line = line.lstrip("#")  # Activar
+            updated_lines.append(line)
+
+        with open(RULES_FILE, "w") as file:
+            file.writelines(updated_lines)
+
+        return {"message": f"Regla {sid} {status} correctamente."}
     except Exception as e:
         return {"error": str(e)}
