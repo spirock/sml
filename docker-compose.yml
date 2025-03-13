@@ -42,13 +42,11 @@ services:
       - NET_ADMIN
       - SYS_NICE
     network_mode: host
-    #networks:
-    #  - suricata_network
     volumes:
       - ./suricata/suricata.yaml:/etc/suricata/suricata.yaml # Archivo de configuración
       - ./suricata/rules:/var/lib/suricata/rules # Reglas personalizadas
       - ./suricata/logs:/var/log/suricata # Logs de Suricata
-    command: ["suricata", "-i", "eth0"]
+    command: ["suricata", "-i", "wlan0"] ##depende de la interfaz de red eth0 wlan0
     entrypoint:
       ["/bin/bash", "-c", "ip link set dev eth0 mtu 1500  && suricata -i eth0"]
 
