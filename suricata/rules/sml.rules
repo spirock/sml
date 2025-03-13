@@ -12,6 +12,10 @@ alert udp any any -> any any (msg:"POSIBLE ESCANEO DE PUERTOS - UDP"; threshold:
 # Detección de Escaneo ICMP (Ping Sweep)
 alert icmp any any -> any any (msg:"POSIBLE ESCANEO DE RED - ICMP PING SWEEP"; itype:8; threshold:type both, track by_src, count 5, seconds 60; sid:2000004; rev:1;)
 
-alert http any any -> any any (msg:"Acceso a Facebook detectado"; flow:to_server; http.host; content:"facebook.com"; nocase; sid:1000001; rev:1;)
-alert http any any -> any any (msg:"Acceso a Facebook detectado"; flow:to_server; http.host; content:"https://facebook.com"; nocase; sid:1000002; rev:42;)
-alert http any any -> any any (msg:"Tráfico HTTP detectado"; flow:to_server; sid:1000002; rev:41;)
+# ================ DETECCIÓN DE TRÁFICO HTTP ================
+
+# Detección de acceso a Facebook
+alert http any any -> any any (msg:"Acceso a Facebook detectado"; flow:to_server; content:"facebook.com"; http.host; nocase; sid:1000001; rev:1;)
+
+# Detección de tráfico HTTP general (ejemplo: detectar GET o POST)
+alert http any any -> any any (msg:"Tráfico HTTP detectado"; flow:to_server; content:"GET"; http.method; sid:1000003; rev:1;)
