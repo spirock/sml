@@ -1,6 +1,6 @@
 services:
   database:
-    image: mongo:4.4.18 # mongo:6 mongo 6 para computadores que no sean de apple y no rasberrys
+    image: mongo:6 # mongo 6 para computadores que no sean de apple y no rasberrys
     container_name: mongodb
     restart: always
     environment:
@@ -13,7 +13,7 @@ services:
     healthcheck:
       test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017 --quiet
       interval: 10s
-      timeout: 30s
+      timeout: 10s
       retries: 5
     networks:
       - suricata_network
