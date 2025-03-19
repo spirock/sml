@@ -6,8 +6,8 @@ import asyncio
 import ipaddress  # 📌 Nuevo: Para convertir IPs en valores numéricos
 
 # Ruta donde se guardan las reglas de Suricata
-RULES_FILE = "./suricata/rules/sml.rules"
-DATA_PATH = "/app/suricata_preprocessed.csv"
+RULES_FILE = "/var/lib/suricata/rules/sml.rules"
+DATA_PATH = "/app/models/suricata_preprocessed.csv"
 MODEL_PATH = "/app/models/isolation_forest_model.pkl"
 
 # Cargar el modelo

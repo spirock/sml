@@ -5,7 +5,7 @@ import joblib
 import os
 
 # Rutas de los archivos
-DATA_PATH = "/app/suricata_preprocessed.csv"
+DATA_PATH = "/app/models/suricata_preprocessed.csv"
 MODEL_DIR = "/app/models"
 MODEL_PATH = os.path.join(MODEL_DIR, "isolation_forest_model.pkl")
 

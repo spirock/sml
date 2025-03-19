@@ -67,7 +67,7 @@ async def main():
     df = preprocess_data(events)
 
     if df is not None:
-        df.to_csv("suricata_preprocessed.csv", index=False)  # Guardar datos procesados
+        df.to_csv("/app/models/suricata_preprocessed.csv", index=False)  # Guardar datos procesados
         print("✅ Datos preprocesados guardados en suricata_preprocessed.csv")
     else:
         print("⚠ No se generó ningún archivo CSV.")
