@@ -8,8 +8,8 @@ from db_connection import db
 router = APIRouter()
 
 LOG_FILE = "/var/log/suricata/eve.json"
-#RULES_FILE = "/var/lib/suricata/rules/sml.rules"
-RULES_FILE = "./suricata/rules/sml.rules"
+RULES_FILE = "/var/lib/suricata/rules/sml.rules"
+#RULES_FILE = "./suricata/rules/sml.rules"
 @router.get("/logs")
 async def get_logs():
     """Lee los logs de Suricata directamente desde el archivo eve.json"""

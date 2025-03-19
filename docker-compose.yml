@@ -70,6 +70,7 @@ services:
     environment:
       MONGO_URI: mongodb://user:password@database:27017
     volumes:
+      - ./suricata/rules:/var/lib/suricata/rules # Reglas personalizadas
       - ./suricata/logs:/var/log/suricata # Para leer logs en tiempo real
       - ./logs:/var/log # Nuevo volumen para los logs de FastAPI
       - ./backend/models:/app/models # 📌 Guardar modelos fuera del contenedor
