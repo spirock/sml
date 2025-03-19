@@ -59,7 +59,7 @@ try:
 
     # Agregar los resultados al DataFrame
     df["anomaly_score"] = anomaly_scores
-    df["prediction"] = predictions
+    df["prediction"] = predictionfs
 
     # Guardar resultados en un CSV para análisis
     result_file = "/app/models/suricata_anomaly_analysis.csv"
