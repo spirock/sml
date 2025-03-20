@@ -121,6 +121,11 @@ async def generate_suricata_rules():
         with open(RULES_FILE, "a") as file:
             file.write("\n".join(rules) + "\n")
         print(f"✅ {len(rules)} reglas generadas y guardadas en {RULES_FILE}.")
+
+        # 🔄 Recargar reglas en Suricata
+        print("🔄 Recargando reglas en Suricata...")
+        os.system("suricatasc -c reload-rules")
+        print("✅ Suricata recargó las reglas.")
     else:
         print("⚠ No se detectaron anomalías.")
 
