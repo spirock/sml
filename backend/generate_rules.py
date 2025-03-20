@@ -112,9 +112,13 @@ async def generate_suricata_rules():
             if rule_id not in rules_set:
                 sid = abs(hash(rule_id)) % 100000
 
-                # Evaluar score para decidir acción
-                action = "drop" if event["anomaly_score"] <= -0.2 else "alert"
-                msg = "BLOCKED traffic (high risk)" if action == "drop" else "Suspicious traffic (alert only)"
+                # Evaluar score
+                if event["anomaly_score"] <= -0.2:
+                    action = "drop"
+                    msg = "BLOCKED traffic (high risk)"
+                else:
+                    action = "alert"
+                    msg = "Suspicious traffic (alert only)"
 
                 rule = f'{action} ip {event["src_ip"]} any -> {event["dest_ip"]} any (msg:"{msg}"; sid:{sid}; rev:1;)'
                 rules.append(rule)

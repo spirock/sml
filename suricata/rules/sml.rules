@@ -16,16 +16,3 @@ alert icmp any any -> any any (msg:"POSIBLE ESCANEO DE RED - ICMP PING SWEEP"; i
 
 # Detección de acceso a Facebook
 alert http any any -> any any (msg:"Acceso a Facebook detectado"; flow:to_server; content:"facebook.com"; http.host; nocase; sid:1000001; rev:1;)
-
-# Detección de tráfico HTTP general (ejemplo: detectar GET o POST)
-alert http any any -> any any (msg:"Tráfico HTTP detectado"; flow:to_server; content:"GET"; http.method; sid:1000003; rev:1;)
-alert ip 192.168.65.1 any -> 192.168.65.7 any (msg:"Anomalous traffic detected"; sid:60423; rev:1;)
-alert ip 192.168.65.1 any -> 192.168.65.7 any (msg:"Anomalous traffic detected"; sid:64355; rev:1;)
-alert ip 192.168.65.1 any -> 192.168.65.7 any (msg:"Anomalous traffic detected"; sid:64355; rev:1;)
-alert ip 192.168.65.1 any -> 192.168.65.7 any (msg:"Anomalous traffic detected"; sid:64355; rev:1;)
-alert ip 192.168.65.1 any -> 192.168.65.7 any (msg:"Anomalous traffic detected"; sid:64355; rev:1;)
-alert ip 192.168.65.1 any -> 192.168.65.7 any (msg:"Anomalous traffic detected"; sid:64355; rev:1;)
-alert ip 192.168.65.1 any -> 192.168.65.7 any (msg:"Anomalous traffic detected"; sid:64355; rev:1;)
-alert ip 192.168.65.1 any -> 192.168.65.7 any (msg:"Anomalous traffic detected"; sid:64355; rev:1;)
-alert ip 192.168.65.1 any -> 192.168.65.7 any (msg:"Anomalous traffic detected"; sid:64355; rev:1;)
-alert ip 192.168.65.1 any -> 192.168.65.7 any (msg:"Anomalous traffic detected"; sid:64355; rev:1;)
