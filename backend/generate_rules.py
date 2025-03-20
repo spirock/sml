@@ -90,30 +90,40 @@ async def generate_suricata_rules():
         df_processed_events[col] = pd.to_numeric(df_processed_events[col], errors="coerce")
     df_processed_events.fillna(0, inplace=True)
 
-    # Validar dimensiones para predicción
     df_numeric_events = df_processed_events.select_dtypes(include=[np.number])
+
+    # Alinear índices
+    df_numeric_events = df_numeric_events.reset_index(drop=True)
+    df_events = df_events.reset_index(drop=True)
+
+    # Validar dimensiones
     if df_numeric_events.shape[1] != model.n_features_in_:
         print(f"❌ El modelo espera {model.n_features_in_} columnas, pero recibió {df_numeric_events.shape[1]}.")
         print(f"📝 Columnas entregadas: {df_numeric_events.columns.tolist()}")
         return
 
-    # Predecir anomalías
+    # Predecir anomalías + scores
     print("🔍 Analizando eventos recientes para anomalías...")
-    df_events["prediction"] = model.predict(df_numeric_events)
+    scores = model.decision_function(df_numeric_events)
+    predictions = model.predict(df_numeric_events)
+
+    df_events["anomaly_score"] = scores
+    df_events["prediction"] = predictions
+
     anomalies = df_events[df_events["prediction"] == -1]
 
     # Evitar duplicados
     rules_set = set()
     rules = []
 
-    for _, event in df_events[df_events["prediction"] == -1].iterrows():
+    for _, event in anomalies.iterrows():
         if pd.notna(event["src_ip"]) and pd.notna(event["dest_ip"]):
             rule_id = f"{event['src_ip']}->{event['dest_ip']}"
             if rule_id not in rules_set:
                 sid = abs(hash(rule_id)) % 100000
 
-                # Evaluar score
-                if event["anomaly_score"] <= -0.2:
+                score = event.get("anomaly_score", 0)
+                if score <= -0.2:
                     action = "drop"
                     msg = "BLOCKED traffic (high risk)"
                 else:
@@ -124,18 +134,12 @@ async def generate_suricata_rules():
                 rules.append(rule)
                 rules_set.add(rule_id)
 
-
     # Guardar reglas
     if rules:
         os.makedirs(os.path.dirname(RULES_FILE), exist_ok=True)
         with open(RULES_FILE, "a") as file:
             file.write("\n".join(rules) + "\n")
         print(f"✅ {len(rules)} reglas generadas y guardadas en {RULES_FILE}.")
-
-        # 🔄 Recargar reglas en Suricata
-        print("🔄 Recargando reglas en Suricata...")
-        os.system("suricatasc -c reload-rules")
-        print("✅ Suricata recargó las reglas.")
     else:
         print("⚠ No se detectaron anomalías.")
 
