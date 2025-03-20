@@ -111,6 +111,7 @@ async def generate_suricata_rules():
             rule_id = f"{event['src_ip']}->{event['dest_ip']}"
             if rule_id not in rules_set:
                 sid = abs(hash(rule_id)) % 100000
+                #rule = f'alert ip {event["src_ip"]} any -> {event["dest_ip"]} any (msg:"Anomalous traffic detected"; sid:{sid}; rev:1;)'
                 rule = f'alert ip {event["src_ip"]} any -> {event["dest_ip"]} any (msg:"Anomalous traffic detected"; sid:{sid}; rev:1;)'
                 rules.append(rule)
                 rules_set.add(rule_id)

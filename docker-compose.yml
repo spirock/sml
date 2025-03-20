@@ -37,9 +37,10 @@ services:
     image: jasonish/suricata:latest
     container_name: suricata
     restart: unless-stopped
-    privileged: true
+    privileged: true #necesitamos este para que suricata pueda capturar paquetes al estilo IPS
     cap_add:
       - NET_ADMIN
+      - NET_RAW #permisos para capturar paquetes
       - SYS_NICE
     network_mode: host
     environment:
@@ -48,7 +49,8 @@ services:
       - ./suricata/suricata.yaml:/etc/suricata/suricata.yaml # Archivo de configuración
       - ./suricata/rules:/var/lib/suricata/rules # Reglas personalizadas
       - ./suricata/logs:/var/log/suricata # Logs de Suricata
-    command: ["suricata", "-i", "${NETWORK_INTERFACE}"] ##depende de la interfaz de red eth0 wlan0
+    command: ["suricata", "--af-packet=${NETWORK_INTERFACE}"]
+    #command: ["suricata", "-i", "${NETWORK_INTERFACE}"] ##depende de la interfaz de red eth0 wlan0
     entrypoint:
       [
         "/bin/bash",
