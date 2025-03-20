@@ -1,1 +1,1 @@
-*/5 * * * * /usr/local/bin/python /app/models/generate_rules.py >> /var/log/generate_rules_cron.log 2>&1
+*/5 * * * * /usr/local/bin/python /app/generate_rules.py >> /var/log/generate_rules_cron.log 2>&1

@@ -1,6 +1,7 @@
 
 #!/bin/bash
-
+# Inicia el servicio Avahi
+service avahi-daemon start
 
 
 # Esperar a que MongoDB esté listo
