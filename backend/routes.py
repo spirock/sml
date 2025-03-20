@@ -5,11 +5,22 @@ import pandas as pd
 import joblib
 import numpy as np
 from db_connection import db
+import socket
 router = APIRouter()
 
 LOG_FILE = "/var/log/suricata/eve.json"
 RULES_FILE = "/var/lib/suricata/rules/sml.rules"
 #RULES_FILE = "./suricata/rules/sml.rules"
+
+
+@router.get("/disvovery")
+async def get_discovery():
+    ip_address = socket.gethostbyname(socket.gethostname())
+    return {"message": "Soc SML",
+            "ip": ip_address,
+            "port": 8000,
+            "service":"flowSML"}
+
 @router.get("/logs")
 async def get_logs():
     """Lee los logs de Suricata directamente desde el archivo eve.json"""
