@@ -102,13 +102,18 @@ async def generate_suricata_rules():
     df_events["prediction"] = model.predict(df_numeric_events)
     anomalies = df_events[df_events["prediction"] == -1]
 
-    # Generar reglas Suricata
+    # Evitar duplicados
+    rules_set = set()
     rules = []
+
     for _, event in anomalies.iterrows():
         if pd.notna(event["src_ip"]) and pd.notna(event["dest_ip"]):
-            sid = abs(hash(event["src_ip"] + event["dest_ip"])) % 100000
-            rule = f'alert ip {event["src_ip"]} any -> {event["dest_ip"]} any (msg:"Anomalous traffic detected"; sid:{sid}; rev:1;)'
-            rules.append(rule)
+            rule_id = f"{event['src_ip']}->{event['dest_ip']}"
+            if rule_id not in rules_set:
+                sid = abs(hash(rule_id)) % 100000
+                rule = f'alert ip {event["src_ip"]} any -> {event["dest_ip"]} any (msg:"Anomalous traffic detected"; sid:{sid}; rev:1;)'
+                rules.append(rule)
+                rules_set.add(rule_id)
 
     # Guardar reglas
     if rules:
