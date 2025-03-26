@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 from routes import router  # Asegúrate de que routes.py existe
 import asyncio
 from db_connection import db, init_db
@@ -6,6 +7,10 @@ from db_connection import db, init_db
 app = FastAPI(title="API de Seguridad con Suricata y FastAPI")
 
 app.include_router(router)
+
+
+# Servir frontend desde la carpeta compilada
+#app.mount("/", StaticFiles(directory="frontend", html=True), name="frontend")
 
 @app.on_event("startup")
 async def startup_event():

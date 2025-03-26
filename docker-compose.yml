@@ -78,7 +78,13 @@ services:
       - ./backend/models:/app/models # 📌 Guardar modelos fuera del contenedor
     networks:
       - suricata_network
-
+  frontend:
+    build: ./nginx
+    container_name: frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - fastapi
   cron:
     build: ./cron
     container_name: cron
