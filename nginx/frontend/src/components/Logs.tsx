@@ -4,7 +4,7 @@ const Logs: React.FC = () => {
   const [logs, setLogs] = useState<any[]>([]); // Puedes tipar mejor según el contenido de tus logs
 
   useEffect(() => {
-    fetch("http://fastapi:8000/logs")
+    fetch("http://192.168.1.199:8000/logs")
       .then((res) => res.json())
       .then((data) => setLogs(data));
   }, []);

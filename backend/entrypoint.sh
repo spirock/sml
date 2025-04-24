@@ -24,12 +24,12 @@ echo "✅ Base de datos y colección verificadas."
 python suricata_to_mongo.py &
 
 # Verificar si los datos preprocesados existen, si no, generarlos
-if [ ! -f "suricata_preprocessed.csv" ]; then
+if [ ! -f "models/suricata_preprocessed.csv" ]; then
     echo "Datos preprocesados no encontrados. Ejecutando ml_processing.py..."
     python ml_processing.py 
 
     # Esperar hasta que el archivo sea generado
-    while [ ! -f "suricata_preprocessed.csv" ]; do
+    while [ ! -f "models/suricata_preprocessed.csv" ]; do
         echo "Esperando a que suricata_preprocessed.csv sea generado..."
         sleep 10
     done
@@ -37,7 +37,7 @@ fi
 
 
 # Verificar si el modelo existe, si no, entrenarlo
-if [ ! -f "isolation_forest_model.pkl" ]; then
+if [ ! -f "models/isolation_forest_model.pkl" ]; then
     echo "Modelo no encontrado. Entrenando Isolation Forest..."
     python train_model.py
 else

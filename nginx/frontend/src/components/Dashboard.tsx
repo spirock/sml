@@ -9,12 +9,21 @@ interface Stats {
 
 const Dashboard: React.FC = () => {
   const [stats, setStats] = useState<Stats | null>(null);
+  const backendUrl = process.env.REACT_APP_BACKEND_URL ;
 
   useEffect(() => {
-    fetch("http://fastapi:8000/stats")
-      .then((res) => res.json())
-      .then((data) => setStats(data));
-  }, []);
+    const fetchStats = async () => {
+      try {
+        const res = await fetch(`${backendUrl}/stats`);
+        const data = await res.json();
+        setStats(data);
+      } catch (error) {
+        console.error("❌ Error al cargar estadísticas:", error);
+      }
+    };
+
+    fetchStats();
+  }, [backendUrl]);
 
   if (!stats) return <p>🔄 Cargando estadísticas...</p>;
 

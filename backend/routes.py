@@ -9,8 +9,17 @@ import socket
 router = APIRouter()
 
 LOG_FILE = "/var/log/suricata/eve.json"
+# 📌 Rutas importantes
 RULES_FILE = "/var/lib/suricata/rules/sml.rules"
-#RULES_FILE = "./suricata/rules/sml.rules"
+
+
+
+@router.get("/host-ip")
+async def get_host_ip():
+    """Devuelve la IP local del host donde corre FastAPI (útil para descubrir servicios en red local)."""
+    hostname = socket.gethostname()
+    local_ip = socket.gethostbyname(hostname)
+    return {"ip": local_ip}
 
 
 @router.get("/disvovery")

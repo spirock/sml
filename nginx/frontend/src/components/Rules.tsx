@@ -4,7 +4,7 @@ const Rules: React.FC = () => {
   const [rules, setRules] = useState<string[]>([]);
 
   useEffect(() => {
-    fetch("http://fastapi:8000/rules")
+    fetch("http://192.168.1.199:8000/rules")
       .then((res) => res.json())
       .then((data) => setRules(data.rules || []));
   }, []);

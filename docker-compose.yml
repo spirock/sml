@@ -78,6 +78,7 @@ services:
       - ./backend/models:/app/models # 📌 Guardar modelos fuera del contenedor
     networks:
       - suricata_network
+
   frontend:
     build: ./nginx
     container_name: frontend
@@ -85,6 +86,8 @@ services:
       - "3000:80"
     depends_on:
       - fastapi
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
   cron:
     build: ./cron
     container_name: cron
