@@ -31,15 +31,34 @@ async def get_discovery():
             "service":"flowSML"}
 
 @router.get("/logs")
-async def get_logs():
-    """Lee los logs de Suricata directamente desde el archivo eve.json"""
+async def get_logs(page: int = 1, limit: int = 100):
+    """
+    Lee los últimos logs de Suricata desde eve.json.
+    Soporta paginación. Ejemplo: /logs?page=2&limit=100
+    """
+    MAX_TOTAL = 1000
     if not os.path.exists(LOG_FILE):
         return {"error": "El archivo de logs no existe"}
-    
+
     try:
         with open(LOG_FILE, "r") as f:
-            logs = [json.loads(line) for line in f.readlines()]
-        return logs
+            lines = f.readlines()[-MAX_TOTAL:]  # solo los últimos 1000
+
+        # invertir para mostrar del más reciente al más antiguo
+        lines = list(reversed(lines))
+
+        # paginar
+        start = (page - 1) * limit
+        end = start + limit
+        selected_lines = lines[start:end]
+
+        logs = [json.loads(line) for line in selected_lines if line.strip()]
+        return {
+            "page": page,
+            "limit": limit,
+            "total": len(lines),
+            "logs": logs
+        }
     except Exception as e:
         return {"error": str(e)}
     
