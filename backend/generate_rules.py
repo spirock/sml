@@ -130,7 +130,7 @@ async def generate_suricata_rules():
         # 2. Obtener eventos recientes
         events = await fetch_latest_events()
         if not events:
-            print("No hay eventos recientes para analizar")
+            print("[SM] No hay eventos recientes para analizar")
             return
 
         df_events = pd.DataFrame(events)
@@ -140,7 +140,7 @@ async def generate_suricata_rules():
 
         # 4. Verificar dimensiones del modelo
         if df_numeric.shape[1] != model.n_features_in_:
-            print(f"Error: El modelo espera {model.n_features_in_} features, se obtuvieron {df_numeric.shape[1]}")
+            print(f"[SM] Error: El modelo espera {model.n_features_in_} features, se obtuvieron {df_numeric.shape[1]}")
             return
 
         # 5. Predecir anomalías
@@ -150,7 +150,7 @@ async def generate_suricata_rules():
 
         
         if anomalies.empty:
-            print("No se detectaron anomalías")
+            print("[SM] No se detectaron anomalías")
             return
 
         # 6. Cargar reglas existentes
@@ -174,16 +174,16 @@ async def generate_suricata_rules():
                     f.write("\n".join(manual_rules) + "\n")
                 f.write("\n".join(new_rules) + "\n")
 
-            print(f"✅ {len(new_rules)} nuevas reglas añadidas (Total: {len(manual_rules) + len(new_rules)})")
+            print(f"[SM] ✅ {len(new_rules)} nuevas reglas añadidas (Total: {len(manual_rules) + len(new_rules)})")
 
             # 9. Recargar reglas en Suricata
             if not await reload_suricata_rules():
-                print("⚠ Las reglas se guardaron pero no se recargaron en Suricata")
+                print("[SM] ⚠ Las reglas se guardaron pero no se recargaron en Suricata")
         else:
-            print("No se generaron reglas nuevas (todas existían previamente)")
+            print("[SM] No se generaron reglas nuevas (todas existían previamente)")
 
     except Exception as e:
-        print(f"❌ Error crítico: {str(e)}")
+        print(f"[SM] ❌ Error crítico: {str(e)}")
 
 
 # Punto de entrada principal
