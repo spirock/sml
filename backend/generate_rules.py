@@ -137,7 +137,7 @@ async def generate_suricata_rules():
 
         # 3. Preprocesar eventos para el modelo
         df_numeric = preprocess_data(df_events.copy())
-
+        df_numeric = df_numeric[["src_ip", "dest_ip", "proto", "src_port", "dest_port", "packet_length"]]
         # 4. Verificar dimensiones del modelo
         if df_numeric.shape[1] != model.n_features_in_:
             print(f"[SM] Error: El modelo espera {model.n_features_in_} features, se obtuvieron {df_numeric.shape[1]}")
