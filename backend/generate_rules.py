@@ -5,6 +5,7 @@ import os
 import asyncio
 import ipaddress
 import numpy as np
+import subprocess
 
 # 📌 Rutas importantes
 RULES_FILE = "/var/lib/suricata/rules/sml.rules"
@@ -159,6 +160,23 @@ async def generate_suricata_rules():
             for rule in new_rules:
                 file.write(rule.strip() + "\n")
         print(f"[GR] ✅ {len(new_rules)} nuevas reglas añadidas a {RULES_FILE}.")
+        try:
+            reload_result = subprocess.run(
+                ['suricatasc', '-c', 'reload-rules'],
+                capture_output=True,
+                text=True
+            )
+            
+            if reload_result.returncode == 0 and "OK" in reload_result.stdout:
+                print("[GR] 🔄 Reglas recargadas exitosamente en Suricata")
+            else:
+                error_msg = reload_result.stderr if reload_result.stderr else reload_result.stdout
+                print(f"[GR] ❌ Fallo al recargar reglas: {error_msg}")
+                
+        except FileNotFoundError:
+            print("[GR] ❌ suricatasc no encontrado. ¿Está instalado Suricata?")
+        except Exception as e:
+            print(f"[GR] ❌ Error inesperado al recargar reglas: {str(e)}")
     else:
         print("[GR] No se detectaron anomalías nuevas o todas ya estaban registradas.")
 

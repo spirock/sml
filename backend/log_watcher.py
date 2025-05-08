@@ -15,7 +15,7 @@ class LogHandler(FileSystemEventHandler):
 
     def on_modified(self, event):
         if event.src_path == LOG_PATH:
-            print("Nuevo evento detectado en Suricata. Ejecutando preprocesamiento...")
+            print("[LogW]Nuevo evento detectado en Suricata. Ejecutando preprocesamiento...")
 
             # Ejecutar el preprocesamiento de manera segura en el event loop
             self.loop.run_in_executor(self.executor, lambda: asyncio.run(preprocess_data()))
@@ -25,7 +25,7 @@ def start_watcher(loop):
     observer = Observer()
     observer.schedule(event_handler, path=os.path.dirname(LOG_PATH), recursive=False)
 
-    print(f"🔍 Monitoreando cambios en {LOG_PATH}...")
+    print(f"[LogW] 🔍 Monitoreando cambios en {LOG_PATH}...")
     
     observer.start()
     
