@@ -136,3 +136,31 @@ async def toggle_rule(sid: int, status: str):
         return {"message": f"Regla {sid} {status} correctamente."}
     except Exception as e:
         return {"error": str(e)}
+
+@router.get("/csv-preview")
+async def preview_csv():
+    """Devuelve las primeras filas del archivo Suricata_preprocessed.csv."""
+    csv_path = "Suricata_preprocessed.csv"
+    if not os.path.exists(csv_path):
+        return {"error": "El archivo CSV no existe"}
+    
+    try:
+        df = pd.read_csv(csv_path)
+        return df.head(50).to_dict(orient="records")  # Solo las primeras 50 filas
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@router.get("/log-watcher-status")
+async def log_status():
+    """Muestra las últimas líneas del log_watcher.log si existe."""
+    log_path = "log_watcher.log"
+    if not os.path.exists(log_path):
+        return {"error": "No se encontró log_watcher.log"}
+    
+    try:
+        with open(log_path, "r") as f:
+            lines = f.readlines()[-20:]  # Últimas 20 líneas
+        return {"log": lines}
+    except Exception as e:
+        return {"error": str(e)}

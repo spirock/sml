@@ -13,21 +13,21 @@ MODEL_PATH = "/app/models/isolation_forest_model.pkl"
 
 # 📂 Verificar modelo entrenado
 if not os.path.exists(MODEL_PATH):
-    print(f"❌ No se encontró el modelo {MODEL_PATH}. Asegúrate de entrenarlo antes.")
+    print(f"[GR] ❌ No se encontró el modelo {MODEL_PATH}. Asegúrate de entrenarlo antes.")
     exit(1)
 
 model = joblib.load(MODEL_PATH)
 
 # 📂 Verificar que los datos preprocesados existen
 if not os.path.exists(DATA_PATH):
-    print(f"❌ No se encontró el archivo {DATA_PATH}. Asegúrate de ejecutarlo antes.")
+    print(f"[GR] ❌ No se encontró el archivo {DATA_PATH}. Asegúrate de ejecutarlo antes.")
     exit(1)
 
 df_processed = pd.read_csv(DATA_PATH)
 
 # 🧪 Validar datos
 if df_processed.empty:
-    print("❌ Error: No hay datos para predecir reglas de Suricata.")
+    print("[GR] ❌ Error: No hay datos para predecir reglas de Suricata.")
     exit(1)
 
 # 📌 Convertir IPs a enteros
@@ -53,12 +53,12 @@ df_numeric = df_processed.select_dtypes(include=[np.number])
 # Verificar dimensiones
 expected_features = model.n_features_in_
 if df_numeric.shape[1] != expected_features:
-    print(f"❌ El modelo espera {expected_features} columnas, pero los datos tienen {df_numeric.shape[1]}.")
-    print(f"📝 Columnas entregadas: {df_numeric.columns.tolist()}")
+    print(f"[GR] ❌ El modelo espera {expected_features} columnas, pero los datos tienen {df_numeric.shape[1]}.")
+    print(f"[GR] 📝 Columnas entregadas: {df_numeric.columns.tolist()}")
     exit(1)
 
 # 🔍 Ejecutar predicción
-print("🔍 Ejecutando predicciones con Isolation Forest...")
+print("[GR] 🔍 Ejecutando predicciones con Isolation Forest...")
 df_processed["prediction"] = model.predict(df_numeric)
 
 # 📥 Obtener eventos desde MongoDB
@@ -73,14 +73,14 @@ async def generate_suricata_rules():
     df_events = pd.DataFrame(events)
 
     if df_events.empty:
-        print("⚠ No hay eventos recientes para analizar.")
+        print("[GR] ⚠ No hay eventos recientes para analizar.")
         return
 
     # 📊 Columnas necesarias
     required_columns = ["src_ip", "dest_ip", "proto", "src_port", "dest_port", "alert.severity"]
     missing_columns = [col for col in required_columns if col not in df_events.columns]
     if missing_columns:
-        print(f"❌ Error: Faltan columnas necesarias: {missing_columns}")
+        print(f"[GR] ❌ Error: Faltan columnas necesarias: {missing_columns}")
         return
 
     # Preprocesamiento para predicción
@@ -98,12 +98,12 @@ async def generate_suricata_rules():
 
     # Validar dimensiones
     if df_numeric_events.shape[1] != model.n_features_in_:
-        print(f"❌ El modelo espera {model.n_features_in_} columnas, pero recibió {df_numeric_events.shape[1]}.")
-        print(f"📝 Columnas entregadas: {df_numeric_events.columns.tolist()}")
+        print(f"[GR] ❌ El modelo espera {model.n_features_in_} columnas, pero recibió {df_numeric_events.shape[1]}.")
+        print(f"[GR] 📝 Columnas entregadas: {df_numeric_events.columns.tolist()}")
         return
 
     # Predecir anomalías + scores
-    print("🔍 Analizando eventos recientes para anomalías...")
+    print("[GR] 🔍 Analizando eventos recientes para anomalías...")
     scores = model.decision_function(df_numeric_events)
     predictions = model.predict(df_numeric_events)
 
@@ -139,9 +139,9 @@ async def generate_suricata_rules():
         os.makedirs(os.path.dirname(RULES_FILE), exist_ok=True)
         with open(RULES_FILE, "a") as file:
             file.write("\n".join(rules) + "\n")
-        print(f"✅ {len(rules)} reglas generadas y guardadas en {RULES_FILE}.")
+        print(f"[GR] ✅ {len(rules)} reglas generadas y guardadas en {RULES_FILE}.")
     else:
-        print("⚠ No se detectaron anomalías.")
+        print("[GR] No se detectaron anomalías.")
 
 # 🚀 Ejecutar
 if __name__ == "__main__":
