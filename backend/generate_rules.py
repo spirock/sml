@@ -67,7 +67,14 @@ async def fetch_latest_events():
     cursor = collection.find({}, {"_id": 0}).limit(100)
     return await cursor.to_list(length=100)
 
-# 🧠 Generar reglas Suricata desde tráfico anómalo
+def rule_exists_in_file(rule_content, filename):
+    """Verifica si una regla ya existe en el archivo"""
+    if not os.path.exists(filename):
+        return False
+    with open(filename, 'r') as f:
+        existing_rules = f.read().splitlines()
+    return rule_content in existing_rules
+
 async def generate_suricata_rules():
     events = await fetch_latest_events()
     df_events = pd.DataFrame(events)
@@ -112,36 +119,49 @@ async def generate_suricata_rules():
 
     anomalies = df_events[df_events["prediction"] == -1]
 
-    # Evitar duplicados
+    # Cargar reglas existentes para evitar duplicados
+    existing_rules = set()
+    if os.path.exists(RULES_FILE):
+        with open(RULES_FILE, 'r') as f:
+            existing_rules = set(line.strip() for line in f if line.strip())
+
+    # Generar nuevas reglas
     rules_set = set()
-    rules = []
+    new_rules = []
 
     for _, event in anomalies.iterrows():
         if pd.notna(event["src_ip"]) and pd.notna(event["dest_ip"]):
-            rule_id = f"{event['src_ip']}->{event['dest_ip']}"
-            if rule_id not in rules_set:
-                sid = abs(hash(rule_id)) % 100000
+            # Determinar acción basada en el score
+            score = event.get("anomaly_score", 0)
+            if score <= -0.2:
+                action = "drop"
+                msg = "BLOCKED traffic (high risk)"
+            else:
+                action = "alert"
+                msg = "Suspicious traffic (alert only)"
+            
+            # Generar identificador único para la regla
+            rule_id = f"{event['src_ip']}-{event['dest_ip']}-{action}-{msg}"
+            sid = 1000000 + (abs(hash(rule_id)) % 900000 ) # SIDs entre 1,000,000 y 1,999,999
+            
+            # Construir contenido de la regla
+            rule_content = f'{action} ip {event["src_ip"]} any -> {event["dest_ip"]} any (msg:"{msg}"; sid:{sid}; rev:1;)'
+            
+            # Verificar si la regla es nueva
+            if rule_content not in rules_set and rule_content not in existing_rules:
+                new_rules.append(rule_content)
+                rules_set.add(rule_content)
 
-                score = event.get("anomaly_score", 0)
-                if score <= -0.2:
-                    action = "drop"
-                    msg = "BLOCKED traffic (high risk)"
-                else:
-                    action = "alert"
-                    msg = "Suspicious traffic (alert only)"
-
-                rule = f'{action} ip {event["src_ip"]} any -> {event["dest_ip"]} any (msg:"{msg}"; sid:{sid}; rev:1;)'
-                rules.append(rule)
-                rules_set.add(rule_id)
-
-    # Guardar reglas
-    if rules:
+    # Guardar reglas (modo append para no perder las existentes)
+    if new_rules:
         os.makedirs(os.path.dirname(RULES_FILE), exist_ok=True)
-        with open(RULES_FILE, "a") as file:
-            file.write("\n".join(rules) + "\n")
-        print(f"[GR] ✅ {len(rules)} reglas generadas y guardadas en {RULES_FILE}.")
+        with open(RULES_FILE, 'a') as file:
+            for rule in new_rules:
+                file.write(rule.strip() + "\n")
+        print(f"[GR] ✅ {len(new_rules)} nuevas reglas añadidas a {RULES_FILE}.")
     else:
-        print("[GR] No se detectaron anomalías.")
+        print("[GR] No se detectaron anomalías nuevas o todas ya estaban registradas.")
+
 
 # 🚀 Ejecutar
 if __name__ == "__main__":
