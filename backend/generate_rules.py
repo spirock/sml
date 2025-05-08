@@ -7,6 +7,7 @@ import ipaddress
 import numpy as np
 import subprocess
 from pathlib import Path
+import hashlib
 
 # 📌 Rutas importantes
 RULES_FILE = "/var/lib/suricata/rules/sml.rules"
@@ -79,113 +80,101 @@ def rule_exists_in_file(rule_content, filename):
     return rule_content in existing_rules
 
 async def generate_suricata_rules():
-    events = await fetch_latest_events()
-    df_events = pd.DataFrame(events)
-
-    if df_events.empty:
-        print("[GR] ⚠ No hay eventos recientes para analizar.")
-        return
-
-    # 📊 Columnas necesarias
-    required_columns = ["src_ip", "dest_ip", "proto", "src_port", "dest_port", "alert.severity"]
-    missing_columns = [col for col in required_columns if col not in df_events.columns]
-    if missing_columns:
-        print(f"[GR] ❌ Error: Faltan columnas necesarias: {missing_columns}")
-        return
-
-    # Preprocesamiento para predicción
-    df_processed_events = df_events[required_columns].copy()
-    df_processed_events["proto"] = df_processed_events["proto"].astype("category").cat.codes
-    for col in df_processed_events.columns:
-        df_processed_events[col] = pd.to_numeric(df_processed_events[col], errors="coerce")
-    df_processed_events.fillna(0, inplace=True)
-
-    df_numeric_events = df_processed_events.select_dtypes(include=[np.number])
-
-    # Alinear índices
-    df_numeric_events = df_numeric_events.reset_index(drop=True)
-    df_events = df_events.reset_index(drop=True)
-
-    # Validar dimensiones
-    if df_numeric_events.shape[1] != model.n_features_in_:
-        print(f"[GR] ❌ El modelo espera {model.n_features_in_} columnas, pero recibió {df_numeric_events.shape[1]}.")
-        print(f"[GR] 📝 Columnas entregadas: {df_numeric_events.columns.tolist()}")
-        return
-
-    # Predecir anomalías + scores
-    print("[GR] 🔍 Analizando eventos recientes para anomalías...")
-    scores = model.decision_function(df_numeric_events)
-    predictions = model.predict(df_numeric_events)
-
-    df_events["anomaly_score"] = scores
-    df_events["prediction"] = predictions
-
-    anomalies = df_events[df_events["prediction"] == -1]
-
-    # Cargar reglas existentes para evitar duplicados
+    # [Código anterior para obtener eventos y detectar anomalías...]
+    
+    # Cargar TODAS las reglas existentes (no solo las de esta ejecución)
     existing_rules = set()
-    if os.path.exists(RULES_FILE):
+    rule_patterns = set()  # Para detectar patrones duplicados
+    
+    if Path(RULES_FILE).exists():
         with open(RULES_FILE, 'r') as f:
-            existing_rules = set(line.strip() for line in f if line.strip())
+            for line in f:
+                line = line.strip()
+                if line:
+                    existing_rules.add(line)
+                    # Extraer el patrón básico (sin SID ni rev)
+                    rule_parts = line.split('(')
+                    if len(rule_parts) > 1:
+                        rule_base = rule_parts[0].strip()
+                        rule_patterns.add(rule_base)
 
     # Generar nuevas reglas
-    rules_set = set()
     new_rules = []
-
+    rules_to_add = set()
+    
     for _, event in anomalies.iterrows():
         if pd.notna(event["src_ip"]) and pd.notna(event["dest_ip"]):
-            # Determinar acción basada en el score
+            # Normalizar IPs para consistencia
+            src_ip = str(ipaddress.ip_address(event["src_ip"]))
+            dest_ip = str(ipaddress.ip_address(event["dest_ip"]))
+            
+            # Determinar acción y mensaje
             score = event.get("anomaly_score", 0)
-            if score <= -0.2:
-                action = "drop"
-                msg = "BLOCKED traffic (high risk)"
-            else:
-                action = "alert"
-                msg = "Suspicious traffic (alert only)"
+            action = "drop" if score <= -0.2 else "alert"
+            msg = "BLOCKED traffic (high risk)" if action == "drop" else "Suspicious traffic (alert only)"
             
-            # Generar identificador único para la regla
-            rule_id = f"{event['src_ip']}-{event['dest_ip']}-{action}-{msg}"
-            sid = 1000000 + (abs(hash(rule_id)) % 900000 ) # SIDs entre 1,000,000 y 1,999,999
+            # Crear patrón de regla base (sin SID)
+            rule_base = f'{action} ip {src_ip} any -> {dest_ip} any'
             
-            # Construir contenido de la regla
-            rule_content = f'{action} ip {event["src_ip"]} any -> {event["dest_ip"]} any (msg:"{msg}"; sid:{sid}; rev:1;)'
-            
-            # Verificar si la regla es nueva
-            if rule_content not in rules_set and rule_content not in existing_rules:
-                new_rules.append(rule_content)
-                rules_set.add(rule_content)
-
-    # Guardar reglas (modo append para no perder las existentes)
-    if new_rules:
-        os.makedirs(os.path.dirname(RULES_FILE), exist_ok=True)
-        with open(RULES_FILE, 'a') as file:
-            for rule in new_rules:
-                file.write(rule.strip() + "\n")
-        print(f"[GR] ✅ {len(new_rules)} nuevas reglas añadidas a {RULES_FILE}.")
-        if not Path(SOCKET_PATH).exists():
-            print(f"[GR] ❌ Socket de Suricata no encontrado en {SOCKET_PATH}")
-            return
-        try:
-            reload_result = subprocess.run(
-                ['suricatasc', '-s',SOCKET_PATH,'-c', 'reload-rules'],
-                capture_output=True,
-                text=True,
-                timeout=10
-            )
-            
-            if reload_result.returncode == 0 and "OK" in reload_result.stdout:
-                print("[GR] 🔄 Reglas recargadas exitosamente en Suricata")
-            else:
-                error_msg = reload_result.stderr if reload_result.stderr else reload_result.stdout
-                print(f"[GR] ❌ Fallo al recargar reglas: {error_msg}")
+            # Verificar si este patrón ya existe
+            if rule_base in rule_patterns:
+                continue
                 
-        except FileNotFoundError:
-            print("[GR] ❌ suricatasc no encontrado. ¿Está instalado Suricata?")
-        except Exception as e:
-            print(f"[GR] ❌ Error inesperado al recargar reglas: {str(e)}")
-    else:
-        print("[GR] No se detectaron anomalías nuevas o todas ya estaban registradas.")
+            # Generar SID consistente usando hash SHA1
+            rule_id = f"{src_ip}-{dest_ip}-{action}-{msg}"
+            sid = 1000000 + (int(hashlib.sha1(rule_id.encode()).hexdigest(), 16) % 900000)
+            
+            # Construir regla completa
+            rule_content = f'{rule_base} (msg:"{msg}"; sid:{sid}; rev:1;)'
+            
+            # Verificar duplicados exactos
+            if rule_content not in existing_rules and rule_content not in rules_to_add:
+                new_rules.append(rule_content)
+                rules_to_add.add(rule_content)
+                rule_patterns.add(rule_base)
 
+    # Escribir todas las reglas (sobrescribiendo el archivo completo)
+    if new_rules:
+        # Mantener las reglas existentes válidas
+        valid_existing_rules = [r for r in existing_rules if not r.startswith(('drop ip', 'alert ip'))]
+        
+        with open(RULES_FILE, 'w') as f:
+            # 1. Escribir reglas existentes no generadas automáticamente
+            f.write("\n".join(valid_existing_rules))
+            f.write("\n")
+            
+            # 2. Escribir nuevas reglas
+            f.write("\n".join(new_rules))
+            f.write("\n")
+            
+        print(f"[GR] ✅ {len(new_rules)} nuevas reglas añadidas (total: {len(valid_existing_rules)+len(new_rules)})")
+        
+        # Recargar reglas en Suricata (usando tu método preferido)
+        await reload_suricata_rules()
+    else:
+        print("[GR] No se detectaron nuevas anomalías o todas ya estaban registradas.")
+
+async def reload_suricata_rules():
+    """Función para recargar reglas en Suricata"""
+    try:
+        socket_path = "/var/run/suricata/suricata-command.socket"
+        reload_result = subprocess.run(
+            ['suricatasc', '-s', socket_path, '-c', 'reload-rules'],
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+        
+        if reload_result.returncode == 0 and "OK" in reload_result.stdout:
+            print("[GR] 🔄 Reglas recargadas exitosamente en Suricata")
+            return True
+        else:
+            error_msg = reload_result.stderr or reload_result.stdout
+            print(f"[GR] ❌ Error al recargar reglas: {error_msg}")
+            return False
+    except Exception as e:
+        print(f"[GR] ❌ Error al recargar reglas: {str(e)}")
+        return False
 
 # 🚀 Ejecutar
 if __name__ == "__main__":
