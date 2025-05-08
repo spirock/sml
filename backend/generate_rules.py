@@ -114,10 +114,10 @@ async def reload_suricata_rules():
             return True
         else:
             error = result.stderr or result.stdout
-            print(f"Error al recargar reglas: {error}")
+            print(f"[SM] Error al recargar reglas: {error}")
             return False
     except Exception as e:
-        print(f"Excepción al recargar reglas: {str(e)}")
+        print(f"[SM] Excepción al recargar reglas: {str(e)}")
         return False
 
 

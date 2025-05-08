@@ -15,9 +15,9 @@ async def read_last_event():
             if lines:
                 return json.loads(lines[-1])  # Devuelve el último evento
     except FileNotFoundError:
-        print("⚠ Archivo eve.json no encontrado.")
+        print("[SM] ⚠ Archivo eve.json no encontrado.")
     except json.JSONDecodeError as e:
-        print(f"⚠ Error al decodificar JSON: {e}")
+        print(f"[SM] ⚠ Error al decodificar JSON: {e}")
     return None
 
 async def insert_event(collection, event_data):
@@ -25,18 +25,18 @@ async def insert_event(collection, event_data):
     try:
         collection = db["events"]
         await collection.insert_one(event_data)
-        print(f"✅ [suricata to Mongo] Evento insertado en MongoDB: {event_data}")
+        print(f"[SM] ✅ [suricata to Mongo] Evento insertado en MongoDB: {event_data}")
     except Exception as e:
-        print(f"⚠ [suricata to Mongo] Error al insertar en MongoDB: {e}")
+        print(f"[SM] ⚠ [suricata to Mongo] Error al insertar en MongoDB: {e}")
 
 async def main():
     """Bucle principal para monitorear eve.json e insertar eventos en MongoDB."""
-    print("🚀 [suricata to Mongo] Iniciando monitoreo de Suricata...")
+    print("[SM] 🚀 [suricata to Mongo] Iniciando monitoreo de Suricata...")
     await db.list_collection_names()  # Asegurar conexión inicial
     collection = db["events"]  # 🔹 Definir la colección aquí
     last_timestamp = None
     while True:
-        print("🔁 [suricata to Mongo] Revisando el archivo eve.json...", flush=True)
+        print("[SM] 🔁 [suricata to Mongo] Revisando el archivo eve.json...", flush=True)
         event = await read_last_event()
         if event and event.get("event_type") == "alert":
             # Verificar si el evento es nuevo
@@ -55,9 +55,9 @@ async def main():
                     "timestamp": event.get("timestamp", "Desconocido")
                 }
                 await insert_event(collection,event_data)
-                print("⚠ [suricata to Mongo] Evento de alimentacion creado.")
+                print("[SM] ⚠ Evento de alimentacion creado.")
         else:
-            print("⚠ [suricata to Mongo] Evento ignorado (no es una alerta).")
+            print("[SM] ⚠ Evento ignorado (no es una alerta).")
 
         await asyncio.sleep(5)  # Espera 5 segundos antes de volver a comprobar
 
