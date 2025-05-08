@@ -10,9 +10,9 @@ router = APIRouter()
 
 LOG_FILE = "/var/log/suricata/eve.json"
 # 📌 Rutas importantes
-RULES_FILE = "/var/lib/suricata/rules/sml.rules"
-
-
+#RULES_FILE = "/var/lib/suricata/rules/sml.rules"
+RULES_DIR = "/var/lib/suricata/rules"
+  
 
 @router.get("/host-ip")
 async def get_host_ip():
@@ -118,17 +118,33 @@ async def get_model_stats():
     }
 
 
-
 @router.get("/rules")
-async def list_rules():
-    """Devuelve la lista de reglas de Suricata."""
+async def list_rules(file: Optional[str] = Query(None, description="Nombre del archivo de reglas")):
+    """
+    Devuelve las reglas de un archivo específico o lista los nombres disponibles.
+    Ejemplo: /rules?file=sml.rules
+    """
     try:
-        with open(RULES_FILE, "r") as file:
-            rules = file.readlines()
-        return {"rules": rules}
+        if file:
+            file_path = os.path.join(RULES_DIR, file)
+            if not os.path.exists(file_path):
+                return {"error": f"El archivo {file} no existe en {RULES_DIR}"}
+            with open(file_path, "r") as f:
+                rules = f.readlines()
+            return {
+                "file": file,
+                "rules": rules
+            }
+        else:
+            # Si no se pasa archivo, devolver listado de archivos .rules disponibles
+            files = [f for f in os.listdir(RULES_DIR) if f.endswith(".rules")]
+            return {
+                "available_rule_files": files,
+                "message": "Usa /rules?file=nombre.rules para ver el contenido."
+            }
     except Exception as e:
         return {"error": str(e)}
-    
+
 
 @router.put("/rules/{sid}/{status}")
 async def toggle_rule(sid: int, status: str):
