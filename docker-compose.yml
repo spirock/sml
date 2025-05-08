@@ -101,6 +101,7 @@ services:
       - ./logs:/var/log # Para logs de cron
       - ./backend:/app # Para acceder a generate_rules.py
       - ./backend/models:/app/models # 📌 Acceder a los modelos desde cron
+      - ./suricata/socket:/var/run/suricata # Mismo socket que Suricata
     networks:
       - suricata_network
 
