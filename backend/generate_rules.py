@@ -109,7 +109,7 @@ async def reload_suricata_rules():
             text=True,
             timeout=15
         )
-        
+        print(f"[SM] Resultado de recarga: {result.stdout}")
         if result.returncode == 0 and "OK" in result.stdout:
             return True
         else:
