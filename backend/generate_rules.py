@@ -120,40 +120,43 @@ async def reload_suricata_rules():
         print(f"Excepción al recargar reglas: {str(e)}")
         return False
 
-# 🚀 Función principal
+
+# 🚀 Función principal actualizada y corregida
 async def generate_suricata_rules():
     try:
-        # 1. Cargar recursos
-        model, df_processed = load_resources()
-        df_numeric = preprocess_data(df_processed.copy())
-        
-        # 2. Verificar dimensiones del modelo
-        if df_numeric.shape[1] != model.n_features_in_:
-            print(f"Error: El modelo espera {model.n_features_in_} features, se obtuvieron {df_numeric.shape[1]}")
-            return
-        
-        # 3. Obtener y procesar eventos
+        # 1. Cargar modelo (ya no se usa df_processed aquí)
+        model, _ = load_resources()
+
+        # 2. Obtener eventos recientes
         events = await fetch_latest_events()
         if not events:
             print("No hay eventos recientes para analizar")
             return
-            
+
         df_events = pd.DataFrame(events)
-        
-        # 4. Predecir anomalías
+
+        # 3. Preprocesar eventos para el modelo
+        df_numeric = preprocess_data(df_events.copy())
+
+        # 4. Verificar dimensiones del modelo
+        if df_numeric.shape[1] != model.n_features_in_:
+            print(f"Error: El modelo espera {model.n_features_in_} features, se obtuvieron {df_numeric.shape[1]}")
+            return
+
+        # 5. Predecir anomalías
         df_events["anomaly_score"] = model.decision_function(df_numeric)
         df_events["prediction"] = model.predict(df_numeric)
         anomalies = df_events[df_events["prediction"] == -1].copy()
-        
+
         if anomalies.empty:
             print("No se detectaron anomalías")
             return
-        
-        # 5. Cargar reglas existentes
+
+        # 6. Cargar reglas existentes
         existing_rules, rule_patterns = load_existing_rules()
         new_rules = []
-        
-        # 6. Generar nuevas reglas
+
+        # 7. Generar nuevas reglas evitando duplicados
         for _, event in anomalies.iterrows():
             if pd.notna(event["src_ip"]) and pd.notna(event["dest_ip"]):
                 rule = generate_rule(event)
@@ -161,26 +164,26 @@ async def generate_suricata_rules():
                     if rule not in existing_rules:
                         new_rules.append(rule)
                         rule_patterns.add(rule.split('(')[0].strip())
-        
-        # 7. Guardar reglas (manteniendo las no generadas automáticamente)
+
+        # 8. Guardar reglas (manteniendo manuales intactas)
         if new_rules:
             manual_rules = [r for r in existing_rules if not r.startswith(('drop ip', 'alert ip'))]
-            
             with open(RULES_FILE, 'w') as f:
                 if manual_rules:
                     f.write("\n".join(manual_rules) + "\n")
                 f.write("\n".join(new_rules) + "\n")
-            
-            print(f"✅ {len(new_rules)} nuevas reglas añadidas (Total: {len(manual_rules)+len(new_rules)})")
-            
-            # 8. Recargar reglas en Suricata
+
+            print(f"✅ {len(new_rules)} nuevas reglas añadidas (Total: {len(manual_rules) + len(new_rules)})")
+
+            # 9. Recargar reglas en Suricata
             if not await reload_suricata_rules():
                 print("⚠ Las reglas se guardaron pero no se recargaron en Suricata")
         else:
             print("No se generaron reglas nuevas (todas existían previamente)")
-            
+
     except Exception as e:
         print(f"❌ Error crítico: {str(e)}")
+
 
 # Punto de entrada principal
 if __name__ == "__main__":
