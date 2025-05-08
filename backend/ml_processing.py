@@ -15,7 +15,7 @@ async def fetch_suricata_data():
     
 
     
-    print(f"Se encontraron {len(events)} eventos en MongoDB.")
+    print(f"[ML]Se encontraron {len(events)} eventos en MongoDB.")
     return events
 
 def ip_to_int(ip):
@@ -34,10 +34,10 @@ def preprocess_data(events):
     df = pd.DataFrame(events)
 
     if df.empty:
-        print("⚠ No se encontraron datos en la base de datos. No se generará suricata_preprocessed.csv.")
+        print("[ML] ⚠ No se encontraron datos en la base de datos. No se generará suricata_preprocessed.csv.")
         return None
 
-    print("Procesando los datos de Suricata...")
+    print("[ML] Procesando los datos de Suricata...")
 
     # Seleccionar características clave (ajusta según los datos disponibles)
     selected_columns = ["src_ip", "dest_ip", "proto", "src_port", "dest_port", "alert.severity"]
@@ -45,7 +45,7 @@ def preprocess_data(events):
     # Verificar si las columnas existen antes de seleccionarlas
     missing_columns = [col for col in selected_columns if col not in df.columns]
     if missing_columns:
-        print(f"⚠ Falta(n) las siguientes columnas en los datos de MongoDB: {missing_columns}")
+        print(f"[ML] ⚠ Falta(n) las siguientes columnas en los datos de MongoDB: {missing_columns}")
         return None
 
     df = df[selected_columns].copy()
@@ -68,9 +68,9 @@ async def main():
 
     if df is not None:
         df.to_csv("/app/models/suricata_preprocessed.csv", index=False)  # Guardar datos procesados
-        print("✅ Datos preprocesados guardados en suricata_preprocessed.csv")
+        print("[ML] ✅ Datos preprocesados guardados en suricata_preprocessed.csv")
     else:
-        print("⚠ No se generó ningún archivo CSV.")
+        print("[ML] ⚠ No se generó ningún archivo CSV.")
 
 if __name__ == "__main__":
     asyncio.run(main())
