@@ -148,6 +148,7 @@ async def generate_suricata_rules():
         df_events["prediction"] = model.predict(df_numeric)
         anomalies = df_events[df_events["prediction"] == -1].copy()
 
+        
         if anomalies.empty:
             print("No se detectaron anomalías")
             return
@@ -190,8 +191,10 @@ if __name__ == "__main__":
     try:
         asyncio.run(generate_suricata_rules())
     except RuntimeError as e:
-        if "Event loop is closed" not in str(e):
+        if "Event loop is closed" in str(e):
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             loop.run_until_complete(generate_suricata_rules())
             loop.close()
+        else:
+            raise  # Mostrar el error real si no es el esperado
