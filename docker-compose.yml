@@ -49,6 +49,7 @@ services:
       - ./suricata/suricata.yaml:/etc/suricata/suricata.yaml # Archivo de configuración
       - ./suricata/rules:/var/lib/suricata/rules # Reglas personalizadas
       - ./suricata/logs:/var/log/suricata # Logs de Suricata
+      - ./suricata/socket:/var/run/suricata # Socket compartido
     command: ["suricata", "--af-packet=${NETWORK_INTERFACE}"]
     #command: ["suricata", "-i", "${NETWORK_INTERFACE}"] ##depende de la interfaz de red eth0 wlan0
     entrypoint:
@@ -76,6 +77,7 @@ services:
       - ./suricata/logs:/var/log/suricata # Para leer logs en tiempo real
       - ./logs:/var/log # Nuevo volumen para los logs de FastAPI
       - ./backend/models:/app/models # 📌 Guardar modelos fuera del contenedor
+      - ./suricata/socket:/var/run/suricata # Mismo socket que Suricata
     networks:
       - suricata_network
 

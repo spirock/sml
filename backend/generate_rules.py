@@ -6,11 +6,13 @@ import asyncio
 import ipaddress
 import numpy as np
 import subprocess
+from pathlib import Path
 
 # 📌 Rutas importantes
 RULES_FILE = "/var/lib/suricata/rules/sml.rules"
 DATA_PATH = "/app/models/suricata_preprocessed.csv"
 MODEL_PATH = "/app/models/isolation_forest_model.pkl"
+SOCKET_PATH = "/var/run/suricata/suricata-command.socket"
 
 # 📂 Verificar modelo entrenado
 if not os.path.exists(MODEL_PATH):
@@ -160,11 +162,15 @@ async def generate_suricata_rules():
             for rule in new_rules:
                 file.write(rule.strip() + "\n")
         print(f"[GR] ✅ {len(new_rules)} nuevas reglas añadidas a {RULES_FILE}.")
+        if not Path(SOCKET_PATH).exists():
+            print(f"[GR] ❌ Socket de Suricata no encontrado en {SOCKET_PATH}")
+            return
         try:
             reload_result = subprocess.run(
-                ['suricatasc', '-c', 'reload-rules'],
+                ['suricatasc', '-s',SOCKET_PATH,'-c', 'reload-rules'],
                 capture_output=True,
-                text=True
+                text=True,
+                timeout=10
             )
             
             if reload_result.returncode == 0 and "OK" in reload_result.stdout:
