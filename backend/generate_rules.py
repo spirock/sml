@@ -109,15 +109,15 @@ async def reload_suricata_rules():
             text=True,
             timeout=15
         )
-        print(f"[SM] Resultado de recarga: {result.stdout}")
+        print(f"[GN] Resultado de recarga: {result.stdout}")
         if result.returncode == 0 and "OK" in result.stdout:
             return True
         else:
             error = result.stderr or result.stdout
-            print(f"[SM] Error al recargar reglas: {error}")
+            print(f"[GN] Error al recargar reglas: {error}")
             return False
     except Exception as e:
-        print(f"[SM] Excepción al recargar reglas: {str(e)}")
+        print(f"[GN] Excepción al recargar reglas: {str(e)}")
         return False
 
 
@@ -130,14 +130,11 @@ async def generate_suricata_rules():
         # 2. Obtener eventos recientes
         events = await fetch_latest_events()
         if not events:
-            print("[SM] No hay eventos recientes para analizar")
+            print("[GN] No hay eventos recientes para analizar")
             return
 
         df_events = pd.DataFrame(events)
 
-        # 3. Preprocesar eventos para el modelo
-        #df_numeric = preprocess_data(df_events.copy())
-        #df_numeric = df_numeric[["src_ip", "dest_ip", "proto", "src_port", "dest_port", "packet_length"]]
         # 3. Preprocesar eventos para el modelo
         df_numeric = preprocess_data(df_events.copy())
 
@@ -145,7 +142,7 @@ async def generate_suricata_rules():
         expected_cols = ["src_ip", "dest_ip", "proto", "src_port", "dest_port", "packet_length"]
         missing = [col for col in expected_cols if col not in df_numeric.columns]
         if missing:
-            print(f"[SM] ❌ Faltan columnas esperadas: {missing}")
+            print(f"[GN] ❌ Faltan columnas esperadas: {missing}")
             return
 
         df_numeric = df_numeric[expected_cols]
@@ -153,7 +150,7 @@ async def generate_suricata_rules():
 
         # 4. Verificar dimensiones del modelo
         if df_numeric.shape[1] != model.n_features_in_:
-            print(f"[SM] Error: El modelo espera {model.n_features_in_} features, se obtuvieron {df_numeric.shape[1]}")
+            print(f"[GN] Error: El modelo espera {model.n_features_in_} features, se obtuvieron {df_numeric.shape[1]}")
             return
 
         # 5. Predecir anomalías
@@ -163,7 +160,7 @@ async def generate_suricata_rules():
 
         
         if anomalies.empty:
-            print("[SM] No se detectaron anomalías")
+            print("[GN] No se detectaron anomalías")
             return
 
         # 6. Cargar reglas existentes
@@ -187,16 +184,16 @@ async def generate_suricata_rules():
                     f.write("\n".join(manual_rules) + "\n")
                 f.write("\n".join(new_rules) + "\n")
 
-            print(f"[SM] ✅ {len(new_rules)} nuevas reglas añadidas (Total: {len(manual_rules) + len(new_rules)})")
+            print(f"[GN] ✅ {len(new_rules)} nuevas reglas añadidas (Total: {len(manual_rules) + len(new_rules)})")
 
             # 9. Recargar reglas en Suricata
             if not await reload_suricata_rules():
-                print("[SM] ⚠ Las reglas se guardaron pero no se recargaron en Suricata")
+                print("[GN] ⚠ Las reglas se guardaron pero no se recargaron en Suricata")
         else:
-            print("[SM] No se generaron reglas nuevas (todas existían previamente)")
+            print("[GN] No se generaron reglas nuevas (todas existían previamente)")
 
     except Exception as e:
-        print(f"[SM] ❌ Error crítico: {str(e)}")
+        print(f"[GN] ❌ Error crítico: {str(e)}")
 
 
 # Punto de entrada principal
