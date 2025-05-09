@@ -138,8 +138,14 @@ async def generate_suricata_rules():
         # 3. Preprocesar eventos para el modelo
         df_numeric = preprocess_data(df_events.copy())
 
+
+
+        # ✅ Seleccionar solo las columnas que el modelo espera
+        expected_columns = model.feature_names_in_ if hasattr(model, "feature_names_in_") else list(df_numeric.columns[:model.n_features_in_])
+        df_numeric = df_numeric[[col for col in expected_columns if col in df_numeric.columns]]
+
         # ✅ Seleccionar solo las columnas que espera el modelo
-        expected_cols = ["src_ip", "dest_ip", "proto", "src_port", "dest_port", "packet_length"]
+        expected_cols =   ["src_ip", "dest_ip", "proto", "src_port", "dest_port", "packet_length"]
         missing = [col for col in expected_cols if col not in df_numeric.columns]
         if missing:
             print(f"[GN] ❌ Faltan columnas esperadas: {missing}")
