@@ -8,6 +8,7 @@ import numpy as np
 import subprocess
 from pathlib import Path
 import hashlib
+from bson import ObjectId
 
 # 📌 Configuración de rutas
 RULES_FILE = "/var/lib/suricata/rules/sml.rules"
@@ -122,6 +123,19 @@ async def reload_suricata_rules():
         print(f"[GN] Excepción al recargar reglas: {str(e)}")
         return False
 
+async def mark_events_as_processed(event_ids):
+    """Marca eventos como procesados en MongoDB"""
+    if not event_ids:
+        return
+    
+    try:
+        result = await db["events"].update_many(
+            {"_id": {"$in": event_ids}},
+            {"$set": {"processed": True}}
+        )
+        print(f"[GN] Eventos marcados como procesados: {result.modified_count}")
+    except Exception as e:
+        print(f"[GN] Error al marcar eventos como procesados: {str(e)}")
 
 # 🚀 Función principal actualizada y corregida
 async def generate_suricata_rules():
@@ -136,6 +150,7 @@ async def generate_suricata_rules():
             return
 
         df_events = pd.DataFrame(events)
+        event_ids = [event["_id"] for event in events if "_id" in event]
 
         # 3. Preprocesar eventos para el modelo
         df_numeric = preprocess_data(df_events.copy())
@@ -194,19 +209,14 @@ async def generate_suricata_rules():
 
             print(f"[GN] ✅ {len(new_rules)} nuevas reglas añadidas (Total: {len(manual_rules) + len(new_rules)})")
 
-            # ✅ Marcar eventos como procesados
-            ids_to_update = [event["_id"] for event in db["events"].find({"processed": {"$ne": True}}, {"_id": 1})]
-            if ids_to_update:
-                db["events"].update_many(
-                    {"_id": {"$in": ids_to_update}},
-                    {"$set": {"processed": True}}
-               )
+            
             # 9. Recargar reglas en Suricata
             if not await reload_suricata_rules():
                 print("[GN] ⚠ Las reglas se guardaron pero no se recargaron en Suricata")
-        else:
-            print("[GN] No se generaron reglas nuevas (todas existían previamente)")
-
+        #else:
+        #    print("[GN] No se generaron reglas nuevas (todas existían previamente)")
+        # 10. Marcar eventos como procesados (tanto anomalías como normales)
+        await mark_events_as_processed(event_ids)
     except Exception as e:
         print(f"[GN] ❌ Error crítico: {str(e)}")
 
