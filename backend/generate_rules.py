@@ -55,7 +55,9 @@ def preprocess_data(df):
 async def fetch_latest_events(limit=100):
     """Obtiene los últimos eventos de MongoDB"""
     collection = db["events"]
-    cursor = collection.find({}, {"_id": 0}).limit(limit)
+    #cursor = collection.find({}, {"_id": 0}).limit(limit)
+    cursor = collection.find({"processed": {"$ne": True}}, {"_id": 0}).limit(limit)
+
     return await cursor.to_list(length=limit)
 
 # 🛡️ Gestión de reglas existentes
@@ -192,6 +194,13 @@ async def generate_suricata_rules():
 
             print(f"[GN] ✅ {len(new_rules)} nuevas reglas añadidas (Total: {len(manual_rules) + len(new_rules)})")
 
+            # ✅ Marcar eventos como procesados
+            ids_to_update = [event["_id"] for event in db["events"].find({"processed": {"$ne": True}}, {"_id": 1})]
+            if ids_to_update:
+                db["events"].update_many(
+                    {"_id": {"$in": ids_to_update}},
+                    {"$set": {"processed": True}}
+               )
             # 9. Recargar reglas en Suricata
             if not await reload_suricata_rules():
                 print("[GN] ⚠ Las reglas se guardaron pero no se recargaron en Suricata")
