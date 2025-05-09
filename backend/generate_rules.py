@@ -136,8 +136,21 @@ async def generate_suricata_rules():
         df_events = pd.DataFrame(events)
 
         # 3. Preprocesar eventos para el modelo
+        #df_numeric = preprocess_data(df_events.copy())
+        #df_numeric = df_numeric[["src_ip", "dest_ip", "proto", "src_port", "dest_port", "packet_length"]]
+        # 3. Preprocesar eventos para el modelo
         df_numeric = preprocess_data(df_events.copy())
-        df_numeric = df_numeric[["src_ip", "dest_ip", "proto", "src_port", "dest_port", "packet_length"]]
+
+        # ✅ Seleccionar solo las columnas que espera el modelo
+        expected_cols = ["src_ip", "dest_ip", "proto", "src_port", "dest_port", "packet_length"]
+        missing = [col for col in expected_cols if col not in df_numeric.columns]
+        if missing:
+            print(f"[SM] ❌ Faltan columnas esperadas: {missing}")
+            return
+
+        df_numeric = df_numeric[expected_cols]
+
+
         # 4. Verificar dimensiones del modelo
         if df_numeric.shape[1] != model.n_features_in_:
             print(f"[SM] Error: El modelo espera {model.n_features_in_} features, se obtuvieron {df_numeric.shape[1]}")
