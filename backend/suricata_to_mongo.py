@@ -52,7 +52,8 @@ async def main():
                     "dest_port": event.get("dest_port", 0),
                     "alert.severity": event.get("alert", {}).get("severity", 0),
                     "alert.signature": event.get("alert", {}).get("signature", "Sin firma"),
-                    "timestamp": event.get("timestamp", "Desconocido")
+                    "timestamp": event.get("timestamp", "Desconocido"),
+                    "processed": False  # Campo booleano inicializado como False
                 }
                 await insert_event(collection,event_data)
                 print("[SM] ⚠ Evento de alimentacion creado.")
