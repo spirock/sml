@@ -30,35 +30,52 @@ async def get_discovery():
             "ip": ip_address,
             "port": 8000,
             "service":"flowSML"}
-
 @router.get("/logs")
-async def get_logs(page: int = 1, limit: int = 100):
+async def get_logs(page: int = 1, limit: int = 100, dia: int = None, mes: int = None, ano: int = None):
     """
     Lee los últimos logs de Suricata desde eve.json.
-    Soporta paginación. Ejemplo: /logs?page=2&limit=100
+    Soporta paginación y filtrado opcional por fecha (día, mes, año).
+    Ejemplo: /logs?page=1&limit=100&dia=12&mes=5&ano=2025
     """
     MAX_TOTAL = 1000
     if not os.path.exists(LOG_FILE):
         return {"error": "El archivo de logs no existe"}
 
     try:
+        hoy = datetime.today()
+        dia = dia if dia is not None else hoy.day
+        mes = mes if mes is not None else hoy.month
+        ano = ano if ano is not None else hoy.year
+
+        fecha_objetivo = datetime(ano, mes, dia)
+
         with open(LOG_FILE, "r") as f:
-            lines = f.readlines()[-MAX_TOTAL:]  # solo los últimos 1000
+            lines = f.readlines()[-MAX_TOTAL:]
 
-        # invertir para mostrar del más reciente al más antiguo
-        lines = list(reversed(lines))
+        logs_filtrados = []
+        for line in reversed(lines):  # del más reciente al más antiguo
+            if not line.strip():
+                continue
+            try:
+                log = json.loads(line)
+                timestamp = log.get("timestamp")
+                if timestamp:
+                    fecha_log = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+                    if fecha_log.date() == fecha_objetivo.date():
+                        logs_filtrados.append(log)
+            except Exception:
+                continue
 
-        # paginar
+        # paginar los logs ya filtrados
         start = (page - 1) * limit
         end = start + limit
-        selected_lines = lines[start:end]
+        selected_logs = logs_filtrados[start:end]
 
-        logs = [json.loads(line) for line in selected_lines if line.strip()]
         return {
             "page": page,
             "limit": limit,
-            "total": len(lines),
-            "logs": logs
+            "total": len(logs_filtrados),
+            "logs": selected_logs
         }
     except Exception as e:
         return {"error": str(e)}
