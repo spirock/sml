@@ -24,10 +24,10 @@ def ip_to_int(ip):
         if isinstance(ip, str) and ip.count('.') == 3:  # Verifica que sea una IP válida
             return sum([int(num) << (8 * i) for i, num in enumerate(reversed(ip.split('.')))])
         else:
-            print(f"⚠ Advertencia: IP inválida detectada -> {ip}")
+            print(f"[ML] ⚠ Advertencia: IP inválida detectada -> {ip}")
             return 0  # Asignar 0 si la IP es inválida
     except ValueError:
-        print(f"⚠ Error: No se pudo convertir la IP -> {ip}")
+        print(f"[ML] ⚠ Error: No se pudo convertir la IP -> {ip}")
         return 0
     
 def preprocess_data(events):
@@ -40,7 +40,7 @@ def preprocess_data(events):
     print("[ML] Procesando los datos de Suricata...")
 
     # Seleccionar características clave (ajusta según los datos disponibles)
-    selected_columns = ["src_ip", "dest_ip", "proto", "src_port", "dest_port", "alert.severity"]
+    selected_columns = ["src_ip", "dest_ip", "proto", "src_port", "dest_port", "alert.severity","packet_length"]
 
     # Verificar si las columnas existen antes de seleccionarlas
     missing_columns = [col for col in selected_columns if col not in df.columns]

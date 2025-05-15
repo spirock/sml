@@ -12,7 +12,7 @@ router = APIRouter()
 
 LOG_FILE = "/var/log/suricata/eve.json"
 # 📌 Rutas importantes
-#RULES_FILE = "/var/lib/suricata/rules/sml.rules"
+RULES_FILE = "/var/lib/suricata/rules/sml.rules"
 RULES_DIR = "/var/lib/suricata/rules"
   
 

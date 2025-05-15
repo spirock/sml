@@ -60,6 +60,7 @@ async def main():
                 "dest_port": event.get("dest_port", 0),
                 "alert.severity": event.get("alert", {}).get("severity", 0),
                 "alert.signature": event.get("alert", {}).get("signature", "Sin firma"),
+                "packet_length": event.get("packet", {}).get("length", 0),  # ⬅️ este es vital
                 "timestamp": event.get("timestamp", "Desconocido")
             }
             await insert_event_if_new(collection, event_data)

@@ -25,12 +25,12 @@ python suricata_to_mongo.py &
 
 # Verificar si los datos preprocesados existen, si no, generarlos
 if [ ! -f "models/suricata_preprocessed.csv" ]; then
-    echo "Datos preprocesados no encontrados. Ejecutando ml_processing.py..."
+    echo "[ENTRY] Datos preprocesados no encontrados. Ejecutando ml_processing.py..."
     python ml_processing.py 
 
     # Esperar hasta que el archivo sea generado
     while [ ! -f "models/suricata_preprocessed.csv" ]; do
-        echo "Esperando a que suricata_preprocessed.csv sea generado..."
+        echo "[ENTRY] Esperando a que suricata_preprocessed.csv sea generado..."
         sleep 10
     done
 fi

@@ -112,15 +112,15 @@ async def reload_suricata_rules():
             text=True,
             timeout=15
         )
-        print(f"[GN] Resultado de recarga: {result.stdout}")
+        print(f"[GR] Resultado de recarga: {result.stdout}")
         if result.returncode == 0 and "OK" in result.stdout:
             return True
         else:
             error = result.stderr or result.stdout
-            print(f"[GN] Error al recargar reglas: {error}")
+            print(f"[GR] Error al recargar reglas: {error}")
             return False
     except Exception as e:
-        print(f"[GN] Excepción al recargar reglas: {str(e)}")
+        print(f"[GR] Excepción al recargar reglas: {str(e)}")
         return False
 
 async def mark_events_as_processed(event_ids):
@@ -133,9 +133,9 @@ async def mark_events_as_processed(event_ids):
             {"_id": {"$in": event_ids}},
             {"$set": {"processed": True}}
         )
-        print(f"[GN] Eventos marcados como procesados: {result.modified_count}")
+        print(f"[GR] Eventos marcados como procesados: {result.modified_count}")
     except Exception as e:
-        print(f"[GN] Error al marcar eventos como procesados: {str(e)}")
+        print(f"[GR] Error al marcar eventos como procesados: {str(e)}")
 
 # 🚀 Función principal actualizada y corregida
 async def generate_suricata_rules():
@@ -146,7 +146,7 @@ async def generate_suricata_rules():
         # 2. Obtener eventos recientes
         events = await fetch_latest_events()
         if not events:
-            print("[GN] No hay eventos recientes para analizar")
+            print("[GR] No hay eventos recientes para analizar")
             return
 
         df_events = pd.DataFrame(events)
@@ -165,7 +165,7 @@ async def generate_suricata_rules():
         expected_cols =   ["src_ip", "dest_ip", "proto", "src_port", "dest_port", "packet_length"]
         missing = [col for col in expected_cols if col not in df_numeric.columns]
         if missing:
-            print(f"[GN] ❌ Faltan columnas esperadas: {missing}")
+            print(f"[GR] ❌ Faltan columnas esperadas: {missing}")
             return
 
         df_numeric = df_numeric[expected_cols]
@@ -173,7 +173,7 @@ async def generate_suricata_rules():
 
         # 4. Verificar dimensiones del modelo
         if df_numeric.shape[1] != model.n_features_in_:
-            print(f"[GN] Error: El modelo espera {model.n_features_in_} features, se obtuvieron {df_numeric.shape[1]}")
+            print(f"[GR] Error: El modelo espera {model.n_features_in_} features, se obtuvieron {df_numeric.shape[1]}")
             return
 
         # 5. Predecir anomalías
@@ -183,7 +183,7 @@ async def generate_suricata_rules():
 
         
         if anomalies.empty:
-            print("[GN] No se detectaron anomalías")
+            print("[GR] No se detectaron anomalías")
             return
 
         # 6. Cargar reglas existentes
@@ -207,18 +207,18 @@ async def generate_suricata_rules():
                     f.write("\n".join(manual_rules) + "\n")
                 f.write("\n".join(new_rules) + "\n")
 
-            print(f"[GN] ✅ {len(new_rules)} nuevas reglas añadidas (Total: {len(manual_rules) + len(new_rules)})")
+            print(f"[GR] ✅✅✅ {len(new_rules)} nuevas reglas añadidas (Total: {len(manual_rules) + len(new_rules)})")
 
             
             # 9. Recargar reglas en Suricata
             if not await reload_suricata_rules():
-                print("[GN] ⚠ Las reglas se guardaron pero no se recargaron en Suricata")
+                print("[GR] ⚠ Las reglas se guardaron pero no se recargaron en Suricata")
         #else:
-        #    print("[GN] No se generaron reglas nuevas (todas existían previamente)")
+        #    print("[GR] No se generaron reglas nuevas (todas existían previamente)")
         # 10. Marcar eventos como procesados (tanto anomalías como normales)
         await mark_events_as_processed(event_ids)
     except Exception as e:
-        print(f"[GN] ❌ Error crítico: {str(e)}")
+        print(f"[GR] ❌ Error crítico: {str(e)}")
 
 
 # Punto de entrada principal

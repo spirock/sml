@@ -1,1 +1,2 @@
 alert icmp any any -> any any (msg:"Test ICMP Ping"; sid:999001; rev:1;)
+alert ip any any -> any any (msg:"💥 Regla de prueba siempre activa"; sid:9999999; rev:1;)
