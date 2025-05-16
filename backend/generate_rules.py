@@ -38,26 +38,62 @@ def safe_ip_to_int(ip):
         return 0
     
 # 🔄 Preprocesamiento de datos
+# def preprocess_data(df):
+#     """Preprocesa los datos para el modelo"""
+#     # Convertir IPs a enteros
+#     for ip_col in ["src_ip", "dest_ip"]:
+#         if ip_col in df.columns:
+#             df[ip_col] = df[ip_col].astype(str).apply(safe_ip_to_int)
+            
+            
+#     # Convertir todas las columnas a numérico
+#     for col in df.columns:
+#         df[col] = pd.to_numeric(df[col], errors="coerce")
+    
+#     return df.fillna(0).select_dtypes(include=[np.number])
+
 def preprocess_data(df):
     """Preprocesa los datos para el modelo"""
+    expected_numeric = [
+        "src_ip", "dest_ip", "proto",
+        "src_port", "dest_port",
+        "alert_severity", "packet_length"
+    ]
+
     # Convertir IPs a enteros
     for ip_col in ["src_ip", "dest_ip"]:
         if ip_col in df.columns:
             df[ip_col] = df[ip_col].astype(str).apply(safe_ip_to_int)
-            
-            
-    # Convertir todas las columnas a numérico
-    for col in df.columns:
-        df[col] = pd.to_numeric(df[col], errors="coerce")
-    
-    return df.fillna(0).select_dtypes(include=[np.number])
+
+    # Convertir a numérico explícitamente
+    for col in expected_numeric:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+        else:
+            print(f"[GR] ⚠️ Columna faltante durante preprocesamiento: {col}")
+            df[col] = 0  # Rellenar con 0 si falta, para evitar que explote
+
+    return df.fillna(0)[expected_numeric]
 
 # 📥 Obtener eventos desde MongoDB
 async def fetch_latest_events(limit=100):
     """Obtiene los últimos eventos de MongoDB"""
     collection = db["events"]
     #cursor = collection.find({}, {"_id": 0}).limit(limit)
-    cursor = collection.find({"processed": {"$ne": True}}, {"_id": 0}).limit(limit)
+    cursor = collection.find(
+    {"processed": {"$ne": True}},
+        {
+            "_id": 1,
+            "src_ip": 1,
+            "dest_ip": 1,
+            "proto": 1,
+            "src_port": 1,
+            "dest_port": 1,
+            "alert_severity": 1,
+            "packet_length": 1,
+            "timestamp": 1
+        }
+    ).limit(limit)
 
     return await cursor.to_list(length=limit)
 
@@ -162,7 +198,8 @@ async def generate_suricata_rules():
         df_numeric = df_numeric[[col for col in expected_columns if col in df_numeric.columns]]
 
         # ✅ Seleccionar solo las columnas que espera el modelo
-        expected_cols = ["src_ip", "dest_ip", "proto", "src_port", "dest_port", "alert.severity", "packet_length"]
+        expected_cols = ["src_ip", "dest_ip", "proto", "src_port", "dest_port", "alert_severity", "packet_length"]
+        print("[GR] Columnas reales en df_numeric:", df_numeric.columns.tolist())
         missing = [col for col in expected_cols if col not in df_numeric.columns]
         if missing:
             print(f"[GR] ❌ Faltan columnas esperadas: {missing}")
@@ -173,12 +210,14 @@ async def generate_suricata_rules():
 
         # 4. Verificar dimensiones del modelo
         if df_numeric.shape[1] != model.n_features_in_:
+            print("[GR] Columnas utilizadas por el modelo:", df_numeric.columns.tolist())
             print(f"[GR] Error: El modelo espera {model.n_features_in_} features, se obtuvieron {df_numeric.shape[1]}")
             return
 
         # 5. Predecir anomalías
         df_events["anomaly_score"] = model.decision_function(df_numeric)
         df_events["prediction"] = model.predict(df_numeric)
+        print("[GR] Conteo de predicciones:", df_events["prediction"].value_counts().to_dict())
         anomalies = df_events[df_events["prediction"] == -1].copy()
 
         
@@ -194,8 +233,10 @@ async def generate_suricata_rules():
         for _, event in anomalies.iterrows():
             if pd.notna(event["src_ip"]) and pd.notna(event["dest_ip"]):
                 rule = generate_rule(event)
+                print(f"[GR] ➕ Posible nueva regla:\n{rule}")
                 if rule and rule.split('(')[0].strip() not in rule_patterns:
                     if rule not in existing_rules:
+                        print("[GR] ✅ Esta regla es nueva y se agregará")
                         new_rules.append(rule)
                         rule_patterns.add(rule.split('(')[0].strip())
 

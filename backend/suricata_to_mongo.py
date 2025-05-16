@@ -21,7 +21,7 @@ async def insert_event_if_new(collection, event_data):
         event_data["event_hash"] = event_hash
         event_data["processed"] = False
         await collection.insert_one(event_data)
-        print(f"[SM] ✅ Evento insertado: {event_data['alert.signature']}")
+        print(f"[SM] ✅ Evento insertado: {event_data['alert_signature']}")
     else:
         print("[SM] 🔁 Evento duplicado ignorado")
 
@@ -58,8 +58,8 @@ async def main():
                 "proto": event.get("proto", "UNKNOWN"),
                 "src_port": event.get("src_port", 0),
                 "dest_port": event.get("dest_port", 0),
-                "alert.severity": event.get("alert", {}).get("severity", 0),
-                "alert.signature": event.get("alert", {}).get("signature", "Sin firma"),
+                "alert_severity": event.get("alert", {}).get("severity", 0),
+                "alert_signature": event.get("alert", {}).get("signature", "Sin firma"),
                 "packet_length": event.get("packet", {}).get("length", 0),  # ⬅️ este es vital
                 "timestamp": event.get("timestamp", "Desconocido")
             }

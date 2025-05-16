@@ -40,7 +40,7 @@ def preprocess_data(events):
     print("[ML] Procesando los datos de Suricata...")
 
     # Seleccionar características clave (ajusta según los datos disponibles)
-    selected_columns = ["src_ip", "dest_ip", "proto", "src_port", "dest_port", "alert.severity","packet_length"]
+    selected_columns = ["src_ip", "dest_ip", "proto", "src_port", "dest_port", "alert_severity","packet_length"]
 
     # Verificar si las columnas existen antes de seleccionarlas
     missing_columns = [col for col in selected_columns if col not in df.columns]
