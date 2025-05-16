@@ -13,6 +13,7 @@ COPY requirements.txt /app/requirements.txt
 
 # Instalar dependencias de Python
 RUN pip install --no-cache-dir -r /app/requirements.txt
+RUN apt update && apt install -y --no-install-recommends suricata
 
 # Copiar archivos necesarios
 COPY crontab /etc/cron.d/generate_rules_cron
