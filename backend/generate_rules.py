@@ -110,24 +110,32 @@ def load_existing_rules():
 
 # ✨ Generación de reglas
 def generate_rule(event):
-    """Genera una regla Suricata individual"""
+    """Genera una regla Suricata enriquecida basada en un evento anómalo."""
     try:
         src_ip = str(ipaddress.ip_address(event["src_ip"]))
         dest_ip = str(ipaddress.ip_address(event["dest_ip"]))
     except (ValueError, ipaddress.AddressValueError):
         return None
-    
+
+    proto = event.get("proto", "ip").lower()
+    src_port = int(event.get("src_port", 0))
+    dest_port = int(event.get("dest_port", 0))
+    severity = event.get("alert_severity", 1)
+    packet_len = int(event.get("packet_length", 0))
     score = event.get("anomaly_score", 0)
+
+    # Acción según score
     action = "drop" if score <= -0.2 else "alert"
-    severity = "HIGH risk" if action == "drop" else "suspicious"
-    
-    # Identificador único para SID consistente
-    rule_id = f"{src_ip}-{dest_ip}-{action}-{severity}"
+    severity_tag = "HIGH risk" if action == "drop" else "suspicious"
+
+    # Generar SID único
+    rule_id = f"{src_ip}-{dest_ip}-{proto}-{src_port}-{dest_port}-{severity}-{packet_len}"
     sid = 1000000 + (int(hashlib.sha256(rule_id.encode()).hexdigest(), 16) % 900000)
-    
+
+    # Construcción enriquecida de la regla
     return (
-        f"{action} ip {src_ip} any -> {dest_ip} any "
-        f'(msg:"{severity} traffic (score: {score:.2f})"; '
+        f"{action} {proto} {src_ip} {src_port} -> {dest_ip} {dest_port} "
+        f'(msg:"{severity_tag} traffic (score: {score:.2f}, len: {packet_len}, severity: {severity})"; '
         f"sid:{sid}; rev:1;)"
     )
 
@@ -135,18 +143,12 @@ def generate_rule(event):
 async def reload_suricata_rules():
     """Recarga las reglas en Suricata mediante el socket compartido"""
     try:
-        # result = subprocess.run(
-        #     ['suricatasc', SOCKET_PATH],
-        #     input="reload-rules\n",
-        #     capture_output=True,
-        #     text=True,
-        #     timeout=15
-        # )
+
         result = subprocess.run(
             ["suricatasc", "-c", "reload-rules"],
             capture_output=True,
             text=True,
-            timeout=15
+            timeout=35
         )
         print(f"[GR] Resultado de recarga:\n{result.stdout.strip()}")
 
