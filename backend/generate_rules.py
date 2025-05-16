@@ -158,15 +158,17 @@ def generate_rule(event):
 
 # 🔄 Recarga de reglas en Suricata
 async def reload_suricata_rules():
-    """Recarga las reglas en Suricata mediante el socket"""
+    """Recarga las reglas en Suricata mediante el socket compartido"""
     try:
         result = subprocess.run(
-            ['suricatasc', '-s', SOCKET_PATH, '-c', 'reload-rules'],
+            ['suricatasc', SOCKET_PATH],
+            input="reload-rules\n",
             capture_output=True,
             text=True,
             timeout=15
         )
-        print(f"[GR] Resultado de recarga: {result.stdout}")
+        print(f"[GR] Resultado de recarga:\n{result.stdout.strip()}")
+
         if result.returncode == 0 and "OK" in result.stdout:
             return True
         else:

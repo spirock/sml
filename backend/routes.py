@@ -8,13 +8,19 @@ import numpy as np
 from db_connection import db
 from datetime import datetime
 import socket
+from fastapi import APIRouter, BackgroundTasks
+from generate_rules import generate_suricata_rules  # 👈 Asegúrate que el nombre y la ruta sean correctos
 router = APIRouter()
 
 LOG_FILE = "/var/log/suricata/eve.json"
 # 📌 Rutas importantes
 RULES_FILE = "/var/lib/suricata/rules/sml.rules"
 RULES_DIR = "/var/lib/suricata/rules"
-  
+
+@router.post("/generate-rules")
+async def generate_rules_endpoint(background_tasks: BackgroundTasks):
+    background_tasks.add_task(generate_suricata_rules)
+    return {"message": "🚀 Generación de reglas iniciada en segundo plano"}  
 
 @router.get("/host-ip")
 async def get_host_ip():
