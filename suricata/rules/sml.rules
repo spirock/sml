@@ -1,2 +1,5 @@
 alert icmp any any -> any any (msg:"Test ICMP Ping"; sid:999001; rev:1;)
-alert ip any any -> any any (msg:"💥 Regla de prueba siempre activa"; sid:9999999; rev:1;)
+drop ip 192.168.65.7 any -> 192.168.65.1 any (msg:"HIGH risk traffic (score: -0.22)"; sid:1308187; rev:1;)
+drop ip 192.168.65.1 any -> 192.168.65.7 any (msg:"HIGH risk traffic (score: -0.22)"; sid:1458315; rev:1;)
+drop ip 192.168.65.3 any -> 3.227.111.92 any (msg:"HIGH risk traffic (score: -0.22)"; sid:1776369; rev:1;)
+drop ip 3.227.111.92 any -> 192.168.65.3 any (msg:"HIGH risk traffic (score: -0.22)"; sid:1766337; rev:1;)

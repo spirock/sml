@@ -23,7 +23,16 @@ def load_resources():
         raise FileNotFoundError("No se encontraron los archivos del modelo o datos preprocesados")
     
     model = joblib.load(MODEL_PATH)
+    print("[GR] 📋 Modelo espera:", list(model.feature_names_in_))
     df_processed = pd.read_csv(DATA_PATH)
+
+    # 🔄 Renombrar columnas si vienen con puntos del CSV
+    df_processed = df_processed.rename(columns={
+        "alert.severity": "alert_severity",
+        "packet.length": "packet_length"
+    })
+    
+    #print("[GR] 📋 Modelo espera:", list(model.feature_names_in_))
     print("[GR] Columnas disponibles:", df_processed.columns.tolist())
     if df_processed.empty:
         raise ValueError("No hay datos para predecir reglas de Suricata")
@@ -37,43 +46,52 @@ def safe_ip_to_int(ip):
     except (ValueError, ipaddress.AddressValueError):
         return 0
     
-# 🔄 Preprocesamiento de datos
+
 # def preprocess_data(df):
 #     """Preprocesa los datos para el modelo"""
+#     expected_numeric = [
+#         "src_ip", "dest_ip", "proto",
+#         "src_port", "dest_port",
+#         "alert_severity", "packet_length"
+#     ]
+
 #     # Convertir IPs a enteros
 #     for ip_col in ["src_ip", "dest_ip"]:
 #         if ip_col in df.columns:
 #             df[ip_col] = df[ip_col].astype(str).apply(safe_ip_to_int)
-            
-            
-#     # Convertir todas las columnas a numérico
-#     for col in df.columns:
-#         df[col] = pd.to_numeric(df[col], errors="coerce")
-    
-#     return df.fillna(0).select_dtypes(include=[np.number])
 
-def preprocess_data(df):
+#     # Convertir a numérico explícitamente
+#     for col in expected_numeric:
+#         if col in df.columns:
+#             df[col] = pd.to_numeric(df[col], errors="coerce")
+#         else:
+#             print(f"[GR] ⚠️ Columna faltante durante preprocesamiento: {col}")
+#             df[col] = 0  # Rellenar con 0 si falta, para evitar que explote
+
+#     return df.fillna(0)[expected_numeric]
+def preprocess_data(df, expected_columns):
     """Preprocesa los datos para el modelo"""
-    expected_numeric = [
-        "src_ip", "dest_ip", "proto",
-        "src_port", "dest_port",
-        "alert_severity", "packet_length"
-    ]
+
+    # Renombrar campos a lo que espera el modelo
+    df = df.rename(columns={
+        "alert_severity": "alert.severity",
+        "packet_length": "packet.length"
+    })
 
     # Convertir IPs a enteros
     for ip_col in ["src_ip", "dest_ip"]:
         if ip_col in df.columns:
             df[ip_col] = df[ip_col].astype(str).apply(safe_ip_to_int)
 
-    # Convertir a numérico explícitamente
-    for col in expected_numeric:
+    # Convertir columnas esperadas a numérico
+    for col in expected_columns:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce")
         else:
             print(f"[GR] ⚠️ Columna faltante durante preprocesamiento: {col}")
-            df[col] = 0  # Rellenar con 0 si falta, para evitar que explote
+            df[col] = 0
 
-    return df.fillna(0)[expected_numeric]
+    return df.fillna(0)[expected_columns]
 
 # 📥 Obtener eventos desde MongoDB
 async def fetch_latest_events(limit=100):
@@ -186,11 +204,17 @@ async def generate_suricata_rules():
             return
 
         df_events = pd.DataFrame(events)
+        # Renombrar campos a lo que espera el modelo
+        df_events = df_events.rename(columns={
+            "alert_severity": "alert.severity",
+            "packet_length": "packet.length"
+        })
         event_ids = [event["_id"] for event in events if "_id" in event]
 
         # 3. Preprocesar eventos para el modelo
-        df_numeric = preprocess_data(df_events.copy())
-
+        #df_numeric = preprocess_data(df_events.copy())
+        expected_columns = list(model.feature_names_in_)
+        df_numeric = preprocess_data(df_events.copy(), expected_columns)
 
 
         # ✅ Seleccionar solo las columnas que el modelo espera
@@ -198,7 +222,8 @@ async def generate_suricata_rules():
         df_numeric = df_numeric[[col for col in expected_columns if col in df_numeric.columns]]
 
         # ✅ Seleccionar solo las columnas que espera el modelo
-        expected_cols = ["src_ip", "dest_ip", "proto", "src_port", "dest_port", "alert_severity", "packet_length"]
+        #expected_cols = ["src_ip", "dest_ip", "proto", "src_port", "dest_port", "alert_severity", "packet_length"]
+        expected_cols = list(model.feature_names_in_)
         print("[GR] Columnas reales en df_numeric:", df_numeric.columns.tolist())
         missing = [col for col in expected_cols if col not in df_numeric.columns]
         if missing:
