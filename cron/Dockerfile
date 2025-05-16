@@ -13,6 +13,8 @@ COPY requirements.txt /app/requirements.txt
 
 # Instalar dependencias de Python
 RUN pip install --no-cache-dir -r /app/requirements.txt
+
+RUN apt-get update && apt-get install -y --no-install-recommends gnupg ca-certificates
 RUN apt update && apt install -y --no-install-recommends suricata
 
 # Copiar archivos necesarios

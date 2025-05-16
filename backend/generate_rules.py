@@ -110,34 +110,32 @@ def load_existing_rules():
 
 # ✨ Generación de reglas
 def generate_rule(event):
-    """Genera una regla Suricata enriquecida basada en un evento anómalo."""
+    """Genera una regla Suricata individual más robusta y detallada."""
     try:
         src_ip = str(ipaddress.ip_address(event["src_ip"]))
         dest_ip = str(ipaddress.ip_address(event["dest_ip"]))
+        proto = str(event.get("proto", "ip")).lower()
+        src_port = int(event.get("src_port", 0))
+        dest_port = int(event.get("dest_port", 0))
+        severity = int(event.get("alert_severity", 1))
+        pkt_len = int(event.get("packet_length", 0))
     except (ValueError, ipaddress.AddressValueError):
         return None
 
-    proto = event.get("proto", "ip").lower()
-    src_port = int(event.get("src_port", 0))
-    dest_port = int(event.get("dest_port", 0))
-    severity = event.get("alert_severity", 1)
-    packet_len = int(event.get("packet_length", 0))
-    score = event.get("anomaly_score", 0)
-
-    # Acción según score
+    score = event.get("anomaly_score", 0.0)
     action = "drop" if score <= -0.2 else "alert"
-    severity_tag = "HIGH risk" if action == "drop" else "suspicious"
+    severity_str = "HIGH risk" if action == "drop" else "suspicious"
 
-    # Generar SID único
-    rule_id = f"{src_ip}-{dest_ip}-{proto}-{src_port}-{dest_port}-{severity}-{packet_len}"
-    sid = 1000000 + (int(hashlib.sha256(rule_id.encode()).hexdigest(), 16) % 900000)
+    # Crear un SID más robusto basado en múltiples atributos
+    unique_id = f"{src_ip}-{dest_ip}-{src_port}-{dest_port}-{proto}-{severity}-{pkt_len}-{round(score, 2)}"
+    sid = 1000000 + (int(hashlib.sha256(unique_id.encode()).hexdigest(), 16) % 900000)
 
-    # Construcción enriquecida de la regla
     return (
         f"{action} {proto} {src_ip} {src_port} -> {dest_ip} {dest_port} "
-        f'(msg:"{severity_tag} traffic (score: {score:.2f}, len: {packet_len}, severity: {severity})"; '
+        f'(msg:"{severity_str} traffic (score: {score:.2f}, len: {pkt_len}, severity: {severity})"; '
         f"sid:{sid}; rev:1;)"
     )
+
 
 # 🔄 Recarga de reglas en Suricata
 async def reload_suricata_rules():
