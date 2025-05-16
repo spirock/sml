@@ -24,7 +24,7 @@ def load_resources():
     
     model = joblib.load(MODEL_PATH)
     df_processed = pd.read_csv(DATA_PATH)
-    
+    print("[GR] Columnas disponibles:", df_processed.columns.tolist())
     if df_processed.empty:
         raise ValueError("No hay datos para predecir reglas de Suricata")
     
@@ -162,7 +162,7 @@ async def generate_suricata_rules():
         df_numeric = df_numeric[[col for col in expected_columns if col in df_numeric.columns]]
 
         # ✅ Seleccionar solo las columnas que espera el modelo
-        expected_cols =   ["src_ip", "dest_ip", "proto", "src_port", "dest_port", "packet_length"]
+        expected_cols = ["src_ip", "dest_ip", "proto", "src_port", "dest_port", "alert.severity", "packet_length"]
         missing = [col for col in expected_cols if col not in df_numeric.columns]
         if missing:
             print(f"[GR] ❌ Faltan columnas esperadas: {missing}")
