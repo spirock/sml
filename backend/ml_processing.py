@@ -12,9 +12,7 @@ async def fetch_suricata_data():
     
     cursor = collection.find({}, {"_id": 0})  # Excluir _id para evitar problemas
     events = await cursor.to_list(length=1000)  # Tomar hasta 1000 eventos
-    
-
-    
+    #print(events)
     print(f"[ML]Se encontraron {len(events)} eventos en MongoDB.")
     return events
 

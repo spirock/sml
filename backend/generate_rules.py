@@ -31,11 +31,7 @@ def load_resources():
     df_processed = pd.read_csv(DATA_PATH)
 
     # 🔄 Renombrar columnas si vienen con puntos del CSV
-    df_processed = df_processed.rename(columns={
-        "alert_severity": "alert.severity",
-        "packet_length": "packet.length" 
-    })
-    
+
     #print("[GR] 📋 Modelo espera:", list(model.feature_names_in_))
     print("[GR] Columnas disponibles:", df_processed.columns.tolist())
     if df_processed.empty:
@@ -55,10 +51,7 @@ def preprocess_data(df, expected_columns):
     """Preprocesa los datos para el modelo"""
 
     # Renombrar campos a lo que espera el modelo
-    df = df.rename(columns={
-        "alert_severity": "alert.severity",
-        "packet_length": "packet.length"
-    })
+
 
     # Convertir IPs a enteros
     for ip_col in ["src_ip", "dest_ip"]:
@@ -142,9 +135,15 @@ def generate_rule(event):
 async def reload_suricata_rules():
     """Recarga las reglas en Suricata mediante el socket compartido"""
     try:
+        # result = subprocess.run(
+        #     ['suricatasc', SOCKET_PATH],
+        #     input="reload-rules\n",
+        #     capture_output=True,
+        #     text=True,
+        #     timeout=15
+        # )
         result = subprocess.run(
-            ['suricatasc', SOCKET_PATH],
-            input="reload-rules\n",
+            ["suricatasc", "-c", "reload-rules"],
             capture_output=True,
             text=True,
             timeout=15
@@ -189,10 +188,7 @@ async def generate_suricata_rules():
 
         df_events = pd.DataFrame(events)
         # Renombrar campos a lo que espera el modelo
-        df_events = df_events.rename(columns={
-            "alert_severity": "alert.severity",
-            "packet_length": "packet.length"
-        })
+
         event_ids = [event["_id"] for event in events if "_id" in event]
 
         # 3. Preprocesar eventos para el modelo
