@@ -56,14 +56,15 @@ async def main():
         is_training = config and config.get("training_mode", False)
         training_label = config.get("training_label") if is_training else None
 
-        # Definir eventos permitidos
-        events = ["alert"]
-        if is_training and training_label in ["normal", "anomaly"]:
-            events = ["alert", "dns", "http", "flow", "tls", "stats", "files", "drop", "rawpkt"]
-
-        if event.get("event_type") not in events:
-            print("[SM] ℹ️ Evento ignorado (no es relevante)")
-            continue
+        # Definir comportamiento según modo entrenamiento
+        if is_training:
+            # En modo entrenamiento aceptamos todos los tipos de eventos
+            pass
+        else:
+            # Si no está en modo entrenamiento, solo aceptar eventos tipo "alert"
+            if event.get("event_type") != "alert":
+                print("[SM] ℹ️ Evento ignorado (no es 'alert' y no estamos en entrenamiento)")
+                continue
 
         # Preparar datos del evento
         event_data = {
