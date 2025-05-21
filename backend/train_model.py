@@ -51,11 +51,15 @@ for col in df.columns:
 # Si todavía hay NaN, reemplazarlos con ceros
 df.fillna(0, inplace=True)
 
+label_column = "label_num"
+X = df.drop(columns=["timestamp", "src_ip", "dest_ip", "label_text", label_column], errors="ignore")
+y = df[label_column] if label_column in df.columns else None
+
 # Crear la carpeta models/ si no existe
 os.makedirs(MODEL_DIR, exist_ok=True)
 
 # Verificar que no haya columnas vacías antes de entrenar
-if df.shape[1] == 0:
+if X.shape[1] == 0:
     print("[TM] ❌ Error: No hay columnas en los datos después del preprocesamiento.")
     exit(1)
 
@@ -64,7 +68,7 @@ print("[TM] 🔍 Entrenando modelo Isolation Forest...")
 model = IsolationForest(contamination=0.05, random_state=42)  # 5% de tráfico anómalo
 
 try:
-    model.fit(df)
+    model.fit(X)
     # Guardar el modelo en la carpeta persistente
     joblib.dump(model, MODEL_PATH)
     print(f"[TM] ✅ Modelo entrenado y guardado en {MODEL_PATH}")
@@ -73,20 +77,28 @@ try:
     print("\n [TM] 📊 Evaluando el modelo...")
 
     # Obtener los puntajes de anomalía
-    anomaly_scores = model.decision_function(df)
-    predictions = model.predict(df)
+    anomaly_scores = model.decision_function(X)
+    predictions = model.predict(X)
 
     # Contar anomalías detectadas
     total_anomalies = (predictions == -1).sum()
-    print(f"[TM] ⚠ Total de anomalías detectadas: {total_anomalies} de {len(df)} eventos.")
+    print(f"[TM] ⚠ Total de anomalías detectadas: {total_anomalies} de {len(X)} eventos.")
+
+    # Agregar columnas originales para análisis
+    if "timestamp" in df.columns:
+        X["timestamp"] = df["timestamp"]
+    if "src_ip" in df.columns:
+        X["src_ip"] = df["src_ip"]
+    if "dest_ip" in df.columns:
+        X["dest_ip"] = df["dest_ip"]
 
     # Agregar los resultados al DataFrame
-    df["anomaly_score"] = anomaly_scores
-    df["prediction"] = predictions
+    X["anomaly_score"] = anomaly_scores
+    X["prediction"] = predictions
 
     # Guardar resultados en un CSV para análisis
     result_file = "/app/models/suricata_anomaly_analysis.csv"
-    df.to_csv(result_file, index=False)
+    X.to_csv(result_file, index=False)
     print(f"[TM] ✅ Resultados guardados en {result_file}")
 except Exception as e:
     print(f"[TM] ❌ Error al entrenar el modelo: {e}")

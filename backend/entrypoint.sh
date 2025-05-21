@@ -23,17 +23,15 @@ echo "✅ Base de datos y colección verificadas."
 # Iniciar monitoreo de Suricata en segundo plano
 python suricata_to_mongo.py &
 
-# Verificar si los datos preprocesados existen, si no, generarlos
-if [ ! -f "/app/models/suricata_preprocessed.csv" ]; then
-    echo "[ENTRY] Datos preprocesados no encontrados. Ejecutando ml_processing.py..."
-    python ml_processing.py 
+# Ejecutar ml_processing.py siempre que haya datos nuevos
+echo "[ENTRY] Ejecutando ml_processing.py para actualizar suricata_preprocessed.csv..."
+python ml_processing.py
 
-    # Esperar hasta que el archivo sea generado
-    while [ ! -f "/app/models/suricata_preprocessed.csv" ]; do
-        echo "[ENTRY] Esperando a que suricata_preprocessed.csv sea generado..."
-        sleep 10
-    done
-fi
+# Esperar hasta que el archivo sea generado
+while [ ! -f "/app/models/suricata_preprocessed.csv" ]; do
+    echo "[ENTRY] Esperando a que suricata_preprocessed.csv sea generado..."
+    sleep 10
+done
 
 
 # Verificar si el modelo existe, si no, entrenarlo

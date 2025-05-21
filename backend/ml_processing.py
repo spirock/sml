@@ -54,7 +54,18 @@ def preprocess_data(events):
 
     print("[ML] Procesando los datos de Suricata...")
 
-    # Seleccionar características clave (ajusta según los datos disponibles)
+    # Enriquecer con nuevas features
+    if "timestamp" in df.columns:
+        df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
+        df["hour"] = df["timestamp"].dt.hour.fillna(0)
+        df["is_night"] = df["hour"].apply(lambda h: 1 if h < 7 or h > 20 else 0)
+    else:
+        df["hour"] = 0
+        df["is_night"] = 0
+
+    df["ports_used"] = df.groupby("src_ip")["dest_port"].transform("nunique")
+    df["conn_per_ip"] = df.groupby("src_ip")["dest_ip"].transform("count")
+
     selected_columns = ["src_ip", "dest_ip", "proto", "src_port", "dest_port", "alert_severity", "packet_length", "hour", "is_night", "ports_used", "conn_per_ip"]
 
     # Verificar si las columnas existen antes de seleccionarlas
@@ -71,18 +82,6 @@ def preprocess_data(events):
 
     # Reemplazar valores categóricos del protocolo
     df["proto"] = df["proto"].astype("category").cat.codes
-
-    # Enriquecer con nuevas features
-    if "timestamp" in df.columns:
-        df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
-        df["hour"] = df["timestamp"].dt.hour.fillna(0)
-        df["is_night"] = df["hour"].apply(lambda h: 1 if h < 7 or h > 20 else 0)
-    else:
-        df["hour"] = 0
-        df["is_night"] = 0
-
-    df["ports_used"] = df.groupby("src_ip")["dest_port"].transform("nunique")
-    df["conn_per_ip"] = df.groupby("src_ip")["dest_ip"].transform("count")
 
     # Normalizar todos los datos (excepto timestamp si existe)
     df = df.drop(columns=["timestamp"], errors="ignore")
