@@ -113,34 +113,7 @@ async def predict_anomaly(data: dict):
     except Exception as e:
         return {"error": str(e)}
 
-@router.get("/stats")
-async def get_model_stats():
-    """Devuelve estadísticas de las detecciones del modelo."""
-    collection = db["events"]
-    
-    total_events = await collection.count_documents({})
-    anomalies = await collection.count_documents({"prediction": -1})  # Eventos anómalos
 
-    if total_events == 0:
-        return {"message": "No hay datos disponibles."}
-
-    anomaly_percentage = (anomalies / total_events) * 100
-
-    # Obtener las IPs con más anomalías
-    pipeline = [
-        {"$match": {"prediction": -1}},
-        {"$group": {"_id": "$src_ip", "count": {"$sum": 1}}},
-        {"$sort": {"count": -1}},
-        {"$limit": 5}
-    ]
-    top_ips = await collection.aggregate(pipeline).to_list(length=5)
-
-    return {
-        "total_events": total_events,
-        "anomalies_detected": anomalies,
-        "anomaly_percentage": anomaly_percentage,
-        "top_anomalous_ips": top_ips
-    }
 
 
 @router.get("/rules")
@@ -224,3 +197,54 @@ async def log_status():
         return {"log": lines}
     except Exception as e:
         return {"error": str(e)}
+
+@router.get("/stats")
+async def get_model_stats():
+    """Devuelve estadísticas de las detecciones del modelo."""
+    collection = db["events"]
+    
+    total_events = await collection.count_documents({})
+    anomalies = await collection.count_documents({"prediction": -1})  # Eventos anómalos
+
+    if total_events == 0:
+        return {"message": "No hay datos disponibles."}
+
+    anomaly_percentage = (anomalies / total_events) * 100
+
+    # Obtener las IPs con más anomalías
+    pipeline = [
+        {"$match": {"prediction": -1}},
+        {"$group": {"_id": "$src_ip", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}},
+        {"$limit": 5}
+    ]
+    top_ips = await collection.aggregate(pipeline).to_list(length=5)
+
+    return {
+        "total_events": total_events,
+        "anomalies_detected": anomalies,
+        "anomaly_percentage": anomaly_percentage,
+        "top_anomalous_ips": top_ips
+    }
+
+
+@router.get("/training-mode")
+def get_training_mode():
+    config_collection = db["config"]
+    config = config_collection.find_one({"_id": "mode"})
+    if config:
+        return {"training_mode": config.get("training_mode", False)}
+    else:
+        return {"training_mode": False}
+
+@router.post("/training-mode/on")
+def activate_training_mode():
+    config_collection = db["config"]
+    config_collection.update_one({"_id": "mode"}, {"$set": {"training_mode": True}}, upsert=True)
+    return {"message": "Modo entrenamiento activado."}
+
+@router.post("/training-mode/off")
+def deactivate_training_mode():
+    config_collection = db["config"]
+    config_collection.update_one({"_id": "mode"}, {"$set": {"training_mode": False}}, upsert=True)
+    return {"message": "Modo entrenamiento desactivado."}

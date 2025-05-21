@@ -11,14 +11,14 @@ MODEL_PATH = os.path.join(MODEL_DIR, "isolation_forest_model.pkl")
 
 # Verificar si el archivo de datos existe
 if not os.path.exists(DATA_PATH):
-    print(f"❌ No se encontró el archivo {DATA_PATH}. Asegúrate de ejecutar el preprocesamiento antes.")
+    print(f"[TM]❌ No se encontró el archivo {DATA_PATH}. Asegúrate de ejecutar el preprocesamiento antes.")
     exit(1)
 
 df = pd.read_csv(DATA_PATH)
 
 # Verificar si hay valores NaN o datos faltantes
 if df.isnull().values.any():
-    print("⚠ Advertencia: Se encontraron valores NaN en los datos. Rellenando con ceros.")
+    print("[TM] ⚠ Advertencia: Se encontraron valores NaN en los datos. Rellenando con ceros.")
     df.fillna(0, inplace=True)
 
 # Asegurar que todas las columnas sean numéricas
@@ -33,21 +33,21 @@ os.makedirs(MODEL_DIR, exist_ok=True)
 
 # Verificar que no haya columnas vacías antes de entrenar
 if df.shape[1] == 0:
-    print("❌ Error: No hay columnas en los datos después del preprocesamiento.")
+    print("[TM] ❌ Error: No hay columnas en los datos después del preprocesamiento.")
     exit(1)
 
 # Entrenar el modelo Isolation Forest
-print("🔍 Entrenando modelo Isolation Forest...")
+print("[TM] 🔍 Entrenando modelo Isolation Forest...")
 model = IsolationForest(contamination=0.05, random_state=42)  # 5% de tráfico anómalo
 
 try:
     model.fit(df)
     # Guardar el modelo en la carpeta persistente
     joblib.dump(model, MODEL_PATH)
-    print(f"✅ Modelo entrenado y guardado en {MODEL_PATH}")
+    print(f"[TM] ✅ Modelo entrenado y guardado en {MODEL_PATH}")
 
     # **Evaluación del Modelo**
-    print("\n📊 Evaluando el modelo...")
+    print("\n [TM] 📊 Evaluando el modelo...")
 
     # Obtener los puntajes de anomalía
     anomaly_scores = model.decision_function(df)
@@ -55,7 +55,7 @@ try:
 
     # Contar anomalías detectadas
     total_anomalies = (predictions == -1).sum()
-    print(f"⚠ Total de anomalías detectadas: {total_anomalies} de {len(df)} eventos.")
+    print(f"[TM] ⚠ Total de anomalías detectadas: {total_anomalies} de {len(df)} eventos.")
 
     # Agregar los resultados al DataFrame
     df["anomaly_score"] = anomaly_scores
@@ -64,6 +64,6 @@ try:
     # Guardar resultados en un CSV para análisis
     result_file = "/app/models/suricata_anomaly_analysis.csv"
     df.to_csv(result_file, index=False)
-    print(f"✅ Resultados guardados en {result_file}")
+    print(f"[TM] ✅ Resultados guardados en {result_file}")
 except Exception as e:
-    print(f"❌ Error al entrenar el modelo: {e}")
+    print(f"[TM] ❌ Error al entrenar el modelo: {e}")

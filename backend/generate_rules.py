@@ -10,6 +10,7 @@ from pathlib import Path
 import hashlib
 from bson import ObjectId
 
+
 # 📌 Configuración de rutas
 RULES_FILE = "/var/lib/suricata/rules/sml.rules"
 DATA_PATH = "/app/models/suricata_preprocessed.csv"
@@ -46,6 +47,13 @@ def safe_ip_to_int(ip):
     except (ValueError, ipaddress.AddressValueError):
         return 0
     
+async def is_training_mode():
+    try:
+        config = await db["config"].find_one({"_id": "mode"})
+        return bool(config and config.get("training_mode", False))
+    except Exception as e:
+        print(f"[GR] ⚠ Error al verificar modo entrenamiento: {e}")
+        return False
 
 def preprocess_data(df, expected_columns):
     """Preprocesa los datos para el modelo"""
@@ -182,6 +190,10 @@ async def generate_suricata_rules():
 
         # 2. Obtener eventos recientes
         events = await fetch_latest_events()
+        if await is_training_mode():
+            print("[GR] 🧠 Modo entrenamiento activo: no se generarán reglas para estos eventos.")
+            await mark_events_as_processed([event["_id"] for event in events if "_id" in event])
+            return
         if not events:
             print("[GR] No hay eventos recientes para analizar")
             return

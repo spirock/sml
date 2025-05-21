@@ -49,9 +49,13 @@ async def main():
     print("[SM] 🚀 Iniciando monitoreo continuo de Suricata...")
     await db.list_collection_names()  # Confirma la conexión
     collection = db["events"]
+    config_collection = db["config"]
 
     async for event in monitor_log_file():
         if event.get("event_type") == "alert":
+            config = await config_collection.find_one({"_id": "mode"})
+            is_training = config and config.get("training_mode", False)
+
             event_data = {
                 "src_ip": event.get("src_ip", "0.0.0.0"),
                 "dest_ip": event.get("dest_ip", "0.0.0.0"),
@@ -60,8 +64,9 @@ async def main():
                 "dest_port": event.get("dest_port", 0),
                 "alert_severity": event.get("alert", {}).get("severity", 0),
                 "alert_signature": event.get("alert", {}).get("signature", "Sin firma"),
-                "packet_length": event.get("packet", {}).get("length", 0),  # ⬅️ este es vital
-                "timestamp": event.get("timestamp", "Desconocido")
+                "packet_length": event.get("packet", {}).get("length", 0),
+                "timestamp": event.get("timestamp", "Desconocido"),
+                "training": is_training  # ✅ Etiqueta de entrenamiento
             }
             await insert_event_if_new(collection, event_data)
         else:
