@@ -52,26 +52,39 @@ async def main():
     config_collection = db["config"]
 
     async for event in monitor_log_file():
-        if event.get("event_type") == "alert":
-            config = await config_collection.find_one({"_id": "mode"})
-            is_training = config and config.get("training_mode", False)
+        config = await config_collection.find_one({"_id": "mode"})
+        is_training = config and config.get("training_mode", False)
+        training_label = config.get("training_label") if is_training else None
 
-            event_data = {
-                "src_ip": event.get("src_ip", "0.0.0.0"),
-                "dest_ip": event.get("dest_ip", "0.0.0.0"),
-                "proto": event.get("proto", "UNKNOWN"),
-                "src_port": event.get("src_port", 0),
-                "dest_port": event.get("dest_port", 0),
-                "alert_severity": event.get("alert", {}).get("severity", 0),
-                "alert_signature": event.get("alert", {}).get("signature", "Sin firma"),
-                "packet_length": event.get("packet", {}).get("length", 0),
-                "timestamp": event.get("timestamp", "Desconocido"),
-                "training": is_training,
-                "label": config.get("label", "unknown") if is_training else "none"
-            }
-            await insert_event_if_new(collection, event_data)
-        else:
-            print("[SM] ℹ️ Evento ignorado (no es alerta)")
+        # Definir eventos permitidos
+        events = ["alert"]
+        if is_training and training_label in ["normal", "anomaly"]:
+            events = ["alert", "dns", "http", "flow", "tls", "stats", "files", "drop", "rawpkt"]
+
+        if event.get("event_type") not in events:
+            print("[SM] ℹ️ Evento ignorado (no es relevante)")
+            continue
+
+        # Preparar datos del evento
+        event_data = {
+            "src_ip": event.get("src_ip", "0.0.0.0"),
+            "dest_ip": event.get("dest_ip", "0.0.0.0"),
+            "proto": event.get("proto", "UNKNOWN"),
+            "src_port": event.get("src_port", 0),
+            "dest_port": event.get("dest_port", 0),
+            "alert_severity": event.get("alert", {}).get("severity", 0),
+            "alert_signature": event.get("alert", {}).get("signature", "Sin firma"),
+            "packet_length": event.get("packet", {}).get("length", 0),
+            "timestamp": event.get("timestamp", "Desconocido"),
+            "event_type": event.get("event_type")
+        }
+
+        # Si está en modo entrenamiento, marcar con metadata adicional
+        if is_training and training_label:
+            event_data["training_mode"] = True
+            event_data["training_label"] = training_label
+
+        await insert_event_if_new(collection, event_data)
 
 
 if __name__ == "__main__":
