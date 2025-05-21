@@ -11,13 +11,13 @@ def generate_ground_truth_from_mongo():
     """
     collection = db["events"]
     config = db["config"].find_one({"_id": "mode"})
-    if not config or not config.get("training_mode", False):
+    if not config or not config.get("value", False):
         print("🚫 El modo entrenamiento no está activo. No se generará ground_truth.")
         return
 
     print("🔍 Extrayendo eventos del modo entrenamiento (normal o anomaly)...")
 
-    training_label = config.get("training_label", None)
+    training_label = config.get("label", None)
     if training_label not in ["normal", "anomaly"]:
         print("⚠ La configuración no contiene 'training_label' válido (normal o anomaly).")
         return

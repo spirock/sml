@@ -234,12 +234,12 @@ def get_training_mode():
     config = config_collection.find_one({"_id": "mode"})
     if config:
         return {
-            "training_mode": config.get("training_mode", False),
+            "value": config.get("value", False),
             "label": config.get("label", "undefined")
         }
     else:
         return {
-            "training_mode": False,
+            "value": False,
             "label": "undefined"
         }
 
@@ -250,7 +250,7 @@ def activate_training_mode(label: str = Query(..., description="Tipo de entrenam
     config_collection = db["config"]
     config_collection.update_one(
         {"_id": "mode"},
-        {"$set": {"training_mode": True, "label": label}},
+        {"$set": {"value": True, "label": label}},
         upsert=True
     )
     return {"message": f"Modo entrenamiento activado como '{label}'"}
@@ -260,7 +260,7 @@ def deactivate_training_mode():
     config_collection = db["config"]
     config_collection.update_one(
         {"_id": "mode"},
-        {"$set": {"training_mode": False, "label": "undefined"}},
+        {"$set": {"value": False, "label": "undefined"}},
         upsert=True
     )
     return {"message": "Modo entrenamiento desactivado."}

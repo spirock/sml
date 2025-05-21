@@ -53,8 +53,8 @@ async def main():
 
     async for event in monitor_log_file():
         config = await config_collection.find_one({"_id": "mode"})
-        is_training = config and config.get("training_mode", False)
-        training_label = config.get("training_label") if is_training else None
+        is_training = config and config.get("value", False)
+        training_label = config.get("label") if is_training else "unknown"
 
         # Definir comportamiento según modo entrenamiento
         if is_training:
@@ -77,13 +77,12 @@ async def main():
             "alert_signature": event.get("alert", {}).get("signature", "Sin firma"),
             "packet_length": event.get("packet", {}).get("length", 0),
             "timestamp": event.get("timestamp", "Desconocido"),
-            "event_type": event.get("event_type")
+            "event_type": event.get("event_type"),
+            "training_mode": is_training,
+            "training_label": training_label
         }
 
-        # Si está en modo entrenamiento, marcar con metadata adicional
-        if is_training and training_label:
-            event_data["training_mode"] = True
-            event_data["training_label"] = training_label
+
 
         await insert_event_if_new(collection, event_data)
 
