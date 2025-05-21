@@ -66,7 +66,8 @@ async def main():
                 "alert_signature": event.get("alert", {}).get("signature", "Sin firma"),
                 "packet_length": event.get("packet", {}).get("length", 0),
                 "timestamp": event.get("timestamp", "Desconocido"),
-                "training": is_training  # ✅ Etiqueta de entrenamiento
+                "training": is_training,
+                "label": config.get("label", "unknown") if is_training else "none"
             }
             await insert_event_if_new(collection, event_data)
         else:

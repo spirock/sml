@@ -233,18 +233,34 @@ def get_training_mode():
     config_collection = db["config"]
     config = config_collection.find_one({"_id": "mode"})
     if config:
-        return {"training_mode": config.get("training_mode", False)}
+        return {
+            "training_mode": config.get("training_mode", False),
+            "label": config.get("label", "undefined")
+        }
     else:
-        return {"training_mode": False}
+        return {
+            "training_mode": False,
+            "label": "undefined"
+        }
 
 @router.post("/training-mode/on")
-def activate_training_mode():
+def activate_training_mode(label: str = Query(..., description="Tipo de entrenamiento: 'normal' o 'anomaly'")):
+    if label not in ["normal", "anomaly"]:
+        return {"error": "Etiqueta inválida. Usa 'normal' o 'anomaly'"}
     config_collection = db["config"]
-    config_collection.update_one({"_id": "mode"}, {"$set": {"training_mode": True}}, upsert=True)
-    return {"message": "Modo entrenamiento activado."}
+    config_collection.update_one(
+        {"_id": "mode"},
+        {"$set": {"training_mode": True, "label": label}},
+        upsert=True
+    )
+    return {"message": f"Modo entrenamiento activado como '{label}'"}
 
 @router.post("/training-mode/off")
 def deactivate_training_mode():
     config_collection = db["config"]
-    config_collection.update_one({"_id": "mode"}, {"$set": {"training_mode": False}}, upsert=True)
+    config_collection.update_one(
+        {"_id": "mode"},
+        {"$set": {"training_mode": False, "label": "undefined"}},
+        upsert=True
+    )
     return {"message": "Modo entrenamiento desactivado."}
