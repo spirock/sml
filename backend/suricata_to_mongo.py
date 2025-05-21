@@ -1,3 +1,23 @@
+"""
+suricata_to_mongo.py
+
+📌 Objetivo:
+Este módulo se encarga de leer en tiempo real el archivo de logs `eve.json` generado por Suricata y almacenar en MongoDB únicamente los eventos relevantes.
+
+🧠 Comportamiento:
+- En modo entrenamiento (training_mode=True), guarda todos los eventos sin filtrar (se clasifican como 'normal' o 'anomaly' según configuración).
+- Fuera de modo entrenamiento, solo almacena eventos tipo 'alert' para análisis y generación de reglas.
+- Cada evento se identifica mediante un hash único para evitar duplicados.
+- Añade campos `training_mode` y `training_label` para poder distinguir los datos en fases posteriores del sistema.
+
+🔗 Dependencias:
+- MongoDB vía `db_connection.py`
+- Archivo `eve.json` como fuente de eventos generados por Suricata.
+
+🧪 Uso:
+Este script se ejecuta como parte del backend y puede iniciarse automáticamente desde un entrypoint para mantener la base de datos actualizada en tiempo real.
+
+"""
 import json
 import asyncio
 import hashlib

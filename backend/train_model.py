@@ -1,3 +1,26 @@
+"""
+🔍 train_model.py
+
+📌 Función principal:
+    Entrenar un modelo de Machine Learning (Isolation Forest) utilizando datos preprocesados por `ml_processing.py`.
+    El objetivo es identificar patrones anómalos en el tráfico de red observado por Suricata.
+
+🎯 Objetivo:
+    Cargar los datos procesados desde `suricata_preprocessed.csv`, entrenar un modelo de detección de anomalías,
+    guardar el modelo entrenado (`isolation_forest_model.pkl`) y generar un archivo con los resultados y predicciones
+    (`suricata_anomaly_analysis.csv`).
+
+🔗 Dependencias y vínculos:
+    - Entrada: `/app/models/suricata_preprocessed.csv` (generado por ml_processing.py)
+    - Salida:
+        - `/app/models/isolation_forest_model.pkl` → Modelo entrenado
+        - `/app/models/suricata_anomaly_analysis.csv` → Resultados de score y predicción por evento
+    - Librerías: scikit-learn (IsolationForest), pandas, numpy, joblib
+
+📝 Requisitos previos:
+    Asegurarse de haber ejecutado `ml_processing.py` para que los datos estén preparados antes de entrenar.
+
+"""
 import pandas as pd
 import numpy as np
 from sklearn.ensemble import IsolationForest

@@ -1,3 +1,26 @@
+"""
+log_watcher.py
+
+📌 Propósito:
+    Este módulo monitorea en tiempo real los cambios en el archivo de logs de Suricata (eve.json).
+    Cuando se detecta una modificación, se dispara automáticamente el preprocesamiento de los nuevos datos.
+
+⚙️ Funcionalidad principal:
+    - Usa watchdog para observar el archivo eve.json.
+    - Al detectar cambios, lanza el proceso de preprocesamiento (ml_processing.main).
+    - Esto asegura que los datos estén siempre listos para su análisis o entrenamiento.
+
+🔁 Flujo:
+    1. Suricata escribe eventos en eve.json.
+    2. watchdog detecta el cambio.
+    3. Se ejecuta el script de ml_processing.
+    4. Se genera o actualiza suricata_preprocessed.csv con los datos recientes.
+
+🧩 Dependencias:
+    - watchdog
+    - asyncio
+    - ml_processing.py (debe tener una función main compatible con ejecución async)
+"""
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 import time

@@ -1,3 +1,40 @@
+"""
+generate_rules.py
+
+📌 Función principal:
+    Este módulo analiza eventos recientes desde MongoDB, ejecuta el modelo de detección de anomalías (Isolation Forest),
+    y genera reglas de Suricata para eventos considerados anómalos.
+
+📈 Objetivo:
+    - Clasificar eventos de red como normales o anómalos.
+    - Generar y guardar reglas de Suricata para los eventos detectados como anómalos.
+    - Recargar dinámicamente las reglas en Suricata a través del socket.
+
+🔁 Flujo general:
+    1. Cargar modelo entrenado y datos de preprocesamiento.
+    2. Obtener eventos recientes de MongoDB.
+    3. Evaluar si está activo el modo entrenamiento.
+        - Si está activo, no se generan reglas, solo se marcan eventos.
+    4. Preprocesar los eventos para el modelo de ML.
+    5. Predecir con Isolation Forest y extraer anomalías.
+    6. Generar reglas y evitar duplicados.
+    7. Guardar nuevas reglas en el archivo sml.rules.
+    8. Recargar las reglas en Suricata mediante suricatasc.
+    9. Marcar los eventos como procesados en la base de datos.
+
+🧩 Dependencias:
+    - MongoDB (colección 'events' y 'config')
+    - Archivos:
+        * /app/models/suricata_preprocessed.csv
+        * /app/models/isolation_forest_model.pkl
+        * /var/lib/suricata/rules/sml.rules
+    - Suricata con acceso a suricatasc y su socket.
+
+🛠 Requiere:
+    - Un modelo entrenado previamente.
+    - Datos preprocesados en formato compatible.
+    - Docker con contenedores montados correctamente y permisos adecuados.
+"""
 import joblib
 import pandas as pd
 from db_connection import db
