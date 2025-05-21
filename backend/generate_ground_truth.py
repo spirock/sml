@@ -1,5 +1,3 @@
-
-
 import pandas as pd
 from db_connection import db
 from datetime import datetime
@@ -17,15 +15,19 @@ def generate_ground_truth_from_mongo():
         print("🚫 El modo entrenamiento no está activo. No se generará ground_truth.")
         return
 
-    print("🔍 Extrayendo eventos anómalos durante modo entrenamiento...")
+    print("🔍 Extrayendo eventos del modo entrenamiento (normal o anomaly)...")
 
-    query = {"prediction": -1}
+    training_label = config.get("training_label", None)
+    if training_label not in ["normal", "anomaly"]:
+        print("⚠ La configuración no contiene 'training_label' válido (normal o anomaly).")
+        return
+
+    query = {"training_mode": True}
     projection = {
         "_id": 0,
         "timestamp": 1,
         "src_ip": 1,
-        "dest_ip": 1,
-        "anomaly_score": 1
+        "dest_ip": 1
     }
 
     events = list(collection.find(query, projection))
@@ -34,8 +36,13 @@ def generate_ground_truth_from_mongo():
         return
 
     df = pd.DataFrame(events)
-    df["description"] = "Anomalía detectada durante entrenamiento"
-    df["label"] = "anomaly"
+    if training_label == "anomaly":
+        df["prediction"] = -1
+        df["anomaly_score"] = 1.0
+    elif training_label == "normal":
+        df["prediction"] = 0
+        df["anomaly_score"] = -1.0
+    df["label"] = training_label
 
     os.makedirs(os.path.dirname(GROUND_TRUTH_PATH), exist_ok=True)
     df.to_csv(GROUND_TRUTH_PATH, index=False)
