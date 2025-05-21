@@ -66,7 +66,22 @@ def preprocess_data(events):
     df["ports_used"] = df.groupby("src_ip")["dest_port"].transform("nunique")
     df["conn_per_ip"] = df.groupby("src_ip")["dest_ip"].transform("count")
 
-    selected_columns = ["src_ip", "dest_ip", "proto", "src_port", "dest_port", "alert_severity", "packet_length", "hour", "is_night", "ports_used", "conn_per_ip"]
+    # Añadir columna 'anomaly' basado en training_mode y training_label
+    def label_anomaly(row):
+        if row.get("training_mode") == True:
+            label = row.get("training_label")
+            if label == "normal":
+                return 0
+            elif label == "anomaly":
+                return 1
+        return -1
+
+    df["anomaly"] = df.apply(label_anomaly, axis=1)
+
+    selected_columns = [
+        "src_ip", "dest_ip", "proto", "src_port", "dest_port", "alert_severity",
+        "packet_length", "hour", "is_night", "ports_used", "conn_per_ip", "anomaly"
+    ]
 
     # Verificar si las columnas existen antes de seleccionarlas
     missing_columns = [col for col in selected_columns if col not in df.columns]
