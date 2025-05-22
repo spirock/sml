@@ -172,7 +172,7 @@ def generate_rule(event):
     severity_str = "HIGH risk" if action == "drop" else "suspicious"
 
     # Crear un SID más robusto basado en múltiples atributos
-    unique_id = f"{src_ip}-{dest_ip}-{src_port}-{dest_port}-{proto}-{severity}-{pkt_len}-{round(score, 2)}"
+    unique_id = f"{src_ip}-{dest_ip}-{proto}-{severity}-{pkt_len}-{round(score, 2)}"
     sid = 1000000 + (int(hashlib.sha256(unique_id.encode()).hexdigest(), 16) % 900000)
 
     return (
