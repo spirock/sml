@@ -283,6 +283,27 @@ async def generate_suricata_rules():
         existing_rules, rule_patterns = load_existing_rules()
         new_rules = []
 
+        # 🔍 Paso adicional: detectar escaneo de puertos y generar regla por IP
+        from collections import defaultdict
+        port_scan_ips = defaultdict(set)
+
+        for _, row in anomalies.iterrows():
+            port_scan_ips[row["src_ip"]].add(row["src_port"])
+
+        for ip, ports in port_scan_ips.items():
+            if len(ports) > 50:  # Umbral de escaneo de puertos
+                try:
+                    ip_str = str(ipaddress.ip_address(ip))
+                    rule_base = f"drop ip {ip_str} any -> any any"
+                    if rule_base not in rule_patterns:
+                        sid = 2000000 + int(hashlib.sha256(ip_str.encode()).hexdigest(), 16) % 900000
+                        rule = f'{rule_base} (msg:"Detected port scanning activity from {ip_str}"; sid:{sid}; rev:1;)'
+                        new_rules.append(rule)
+                        rule_patterns.add(rule_base)
+                        print(f"[GR] 🚨 Regla de escaneo añadida para {ip_str}")
+                except Exception as e:
+                    print(f"[GR] ⚠ Error generando regla para IP {ip}: {e}")
+
         # 7. Generar nuevas reglas evitando duplicados
         for _, event in anomalies.iterrows():
             if pd.notna(event["src_ip"]) and pd.notna(event["dest_ip"]):
