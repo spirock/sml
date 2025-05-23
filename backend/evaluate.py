@@ -19,6 +19,20 @@ def evaluar_modelo():
         print("⚠ Archivos vacíos. Asegúrate de haber generado correctamente los datos.")
         return
 
+    # Verificar columnas esperadas en model_output
+    expected_columns = {"timestamp", "src_ip", "dest_ip", "prediction", "anomaly_score"}
+    missing_columns = expected_columns - set(model_output.columns)
+    if missing_columns:
+        print(f"❌ El archivo de salida del modelo no contiene las columnas esperadas: {missing_columns}")
+        return
+
+    # Verificar columnas esperadas en ground_truth
+    expected_gt_columns = {"timestamp", "src_ip", "dest_ip", "label"}
+    missing_gt_columns = expected_gt_columns - set(ground_truth.columns)
+    if missing_gt_columns:
+        print(f"❌ El archivo ground_truth.csv no contiene las columnas esperadas: {missing_gt_columns}")
+        return
+
     # Crear IDs únicos
     ground_truth["id"] = ground_truth["timestamp"] + "-" + ground_truth["src_ip"] + "-" + ground_truth["dest_ip"]
     ground_truth["true_label"] = ground_truth["label"].map({"anomaly": 1, "normal": 0})
