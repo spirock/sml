@@ -105,9 +105,15 @@ def preprocess_data(events):
     # Reemplazar valores categóricos del protocolo
     df["proto"] = df["proto"].astype("category").cat.codes
 
-    # Normalizar todos los datos (excepto timestamp si existe)
+    # Normalizar solo las columnas numéricas
     df = df.drop(columns=["timestamp"], errors="ignore")
-    df = (df - df.min()) / (df.max() - df.min()).replace(0, 1)
+    # Seleccionar columnas numéricas para normalizar
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    df_numeric = df[numeric_cols]
+    df_normalized = (df_numeric - df_numeric.min()) / (df_numeric.max() - df_numeric.min()).replace(0, 1)
+
+    # Combinar con columnas no numéricas (por ejemplo event_id si existe)
+    df = pd.concat([df_normalized, df.drop(columns=numeric_cols)], axis=1)
 
     return df
 
