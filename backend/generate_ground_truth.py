@@ -8,7 +8,8 @@ GROUND_TRUTH_PATH = "/app/models/ground_truth.csv"
 
 async def generate_ground_truth_from_mongo():
     """
-    Extrae eventos de MongoDB marcados como anomalía durante modo entrenamiento y los guarda en un CSV.
+    Extrae eventos de MongoDB marcados como normal o anomalía durante modo entrenamiento y los guarda en un CSV.
+    Añade campos de predicción simulada y etiqueta tipo.
     """
     collection = db["events"]
     config = await db["config"].find_one({"_id": "mode"})
@@ -28,13 +29,22 @@ async def generate_ground_truth_from_mongo():
         "_id": 0,
         "timestamp": 1,
         "src_ip": 1,
-        "dest_ip": 1
+        "dest_ip": 1,
+        "proto": 1,
+        "src_port": 1,
+        "dest_port": 1,
+        "alert_severity": 1,
+        "packet_length": 1,
+        "hour": 1,
+        "is_night": 1,
+        "ports_used": 1,
+        "conn_per_ip": 1
     }
 
     cursor = collection.find(query, projection)
     events = await cursor.to_list(length=None)
     if not events:
-        print("⚠ No se encontraron eventos anómalos.")
+        print("⚠ No se encontraron eventos etiquetados como entrenamiento.")
         return
 
     df = pd.DataFrame(events)
@@ -47,8 +57,12 @@ async def generate_ground_truth_from_mongo():
     df["label"] = training_label
 
     os.makedirs(os.path.dirname(GROUND_TRUTH_PATH), exist_ok=True)
-    df.to_csv(GROUND_TRUTH_PATH, index=False)
-    print(f"✅ Ground truth guardado en {GROUND_TRUTH_PATH} con {len(df)} eventos.")
+    try:
+        df.to_csv(GROUND_TRUTH_PATH, index=False)
+        print(f"✅ Ground truth guardado en {GROUND_TRUTH_PATH} con {len(df)} eventos.")
+        print(df.head(5))
+    except Exception as e:
+        print(f"❌ Error al guardar el archivo: {e}")
 
 if __name__ == "__main__":
     asyncio.run(generate_ground_truth_from_mongo())
