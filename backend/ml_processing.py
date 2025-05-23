@@ -20,6 +20,7 @@ import pandas as pd
 import numpy as np
 import asyncio
 from db_connection import db  # Importar la conexión a MongoDB
+import hashlib
 COLLECTION_NAME = "events"
 
 
@@ -59,6 +60,12 @@ def preprocess_data(events):
         df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
         df["hour"] = df["timestamp"].dt.hour.fillna(0)
         df["is_night"] = df["hour"].apply(lambda h: 1 if h < 7 or h > 20 else 0)
+
+        def generar_event_id(row):
+            base = f"{row['src_ip']}_{row['dest_ip']}_{row['timestamp']}"
+            return hashlib.md5(base.encode()).hexdigest()
+
+        df["event_id"] = df.apply(generar_event_id, axis=1)
     else:
         df["hour"] = 0
         df["is_night"] = 0
@@ -80,7 +87,7 @@ def preprocess_data(events):
 
     selected_columns = [
         "src_ip", "dest_ip", "proto", "src_port", "dest_port", "alert_severity",
-        "packet_length", "hour", "is_night", "ports_used", "conn_per_ip", "anomaly"
+        "packet_length", "hour", "is_night", "ports_used", "conn_per_ip", "anomaly", "event_id"
     ]
 
     # Verificar si las columnas existen antes de seleccionarlas

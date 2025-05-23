@@ -48,13 +48,16 @@ async def generate_ground_truth_from_mongo():
         return
 
     df = pd.DataFrame(events)
-    if training_label == "anomaly":
-        df["prediction"] = -1
-        df["anomaly_score"] = 1.0
-    elif training_label == "normal":
-        df["prediction"] = 0
-        df["anomaly_score"] = -1.0
-    df["label"] = training_label
+    import hashlib
+
+    def generar_event_id(row):
+        base = f"{row['src_ip']}_{row['dest_ip']}_{row['timestamp']}"
+        return hashlib.md5(base.encode()).hexdigest()
+
+    df["event_id"] = df.apply(generar_event_id, axis=1)
+
+    df["anomaly_score"] = 1.0 if training_label == "anomaly" else -1.0
+    df["label"] = 1 if training_label == "anomaly" else 0
 
     os.makedirs(os.path.dirname(GROUND_TRUTH_PATH), exist_ok=True)
     try:

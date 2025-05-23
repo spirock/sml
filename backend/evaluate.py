@@ -19,32 +19,22 @@ def evaluar_modelo():
         print("⚠ Archivos vacíos. Asegúrate de haber generado correctamente los datos.")
         return
 
-    # Verificar columnas esperadas en model_output
-    expected_columns = {"timestamp", "src_ip", "dest_ip", "prediction", "anomaly_score"}
+    expected_columns = {"event_id", "prediction", "anomaly_score"}
     missing_columns = expected_columns - set(model_output.columns)
     if missing_columns:
         print(f"❌ El archivo de salida del modelo no contiene las columnas esperadas: {missing_columns}")
         return
 
-    # Verificar columnas esperadas en ground_truth
-    expected_gt_columns = {"timestamp", "src_ip", "dest_ip", "label"}
+    expected_gt_columns = {"event_id", "label"}
     missing_gt_columns = expected_gt_columns - set(ground_truth.columns)
     if missing_gt_columns:
         print(f"❌ El archivo ground_truth.csv no contiene las columnas esperadas: {missing_gt_columns}")
         return
 
-    # Crear IDs únicos
-    ground_truth["id"] = ground_truth["timestamp"] + "-" + ground_truth["src_ip"] + "-" + ground_truth["dest_ip"]
-    ground_truth["true_label"] = ground_truth["label"].map({"anomaly": 1, "normal": 0})
+    df = pd.merge(model_output, ground_truth, on="event_id", how="inner")
 
-    model_output["id"] = model_output["timestamp"] + "-" + model_output["src_ip"] + "-" + model_output["dest_ip"]
-    model_output["pred_label"] = model_output["prediction"].map({-1: 1, 1: 0})  # Anomalía = 1
-
-    df = model_output.merge(ground_truth[["id", "true_label"]], on="id", how="left")
-    df["true_label"] = df["true_label"].fillna(0).astype(int)  # default: normal
-
-    y_true = df["true_label"]
-    y_pred = df["pred_label"]
+    y_true = df["label"]
+    y_pred = df["prediction"]
     y_score = df["anomaly_score"]
 
     precision = precision_score(y_true, y_pred)
