@@ -31,7 +31,8 @@ async def generate_ground_truth_from_mongo():
         "dest_ip": 1
     }
 
-    events = list(collection.find(query, projection))
+    cursor = collection.find(query, projection)
+    events = await cursor.to_list(length=None)
     if not events:
         print("⚠ No se encontraron eventos anómalos.")
         return
