@@ -45,7 +45,7 @@ def evaluar_modelo():
     y_score = df[score_col]
 
     unique_labels = set(y_true)
-    average_type = 'binary' if unique_labels <= {0, 1} else 'weighted'
+    average_type = 'binary' if len(unique_labels) == 2 and unique_labels <= {0, 1} else 'weighted'
     print(f"🔍 Tipo de clasificación detectado: {'Binaria' if average_type == 'binary' else 'Multiclase'}")
 
     precision = precision_score(y_true, y_pred, average=average_type)
