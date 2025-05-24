@@ -32,10 +32,17 @@ def evaluar_modelo():
         return
 
     df = pd.merge(model_output, ground_truth, on="event_id", how="inner")
+    print(f"🔍 Total eventos combinados: {len(df)}")
+    print(df.head())
 
     y_true = df["label"]
     y_pred = df["prediction"]
-    y_score = df["anomaly_score"]
+    score_col = "anomaly_score_x" if "anomaly_score_x" in df.columns else "anomaly_score"
+    if score_col not in df.columns:
+        print(f"❌ '{score_col}' no encontrado en el DataFrame combinado.")
+        print(f"Columnas disponibles: {df.columns.tolist()}")
+        return
+    y_score = df[score_col]
 
     precision = precision_score(y_true, y_pred)
     recall = recall_score(y_true, y_pred)

@@ -25,13 +25,12 @@ COLLECTION_NAME = "events"
 
 
 
-async def fetch_suricata_data():
+async def fetch_suricata_data(train_only=False):
     collection = db[COLLECTION_NAME]
-    
-    cursor = collection.find({}, {"_id": 0})  # Excluir _id para evitar problemas
+    query = {"training_mode": True} if train_only else {}
+    cursor = collection.find(query)
     events = await cursor.to_list(length=1000)  # Tomar hasta 1000 eventos
-    #print(events)
-    print(f"[ML]Se encontraron {len(events)} eventos en MongoDB.")
+    print(f"[ML] Se encontraron {len(events)} eventos en MongoDB.")
     return events
 
 def ip_to_int(ip):
@@ -57,15 +56,13 @@ def preprocess_data(events):
 
     # Enriquecer con nuevas features
     if "timestamp" in df.columns:
+        # Generar event_id usando _id convertido a string
+        df["event_id"] = df["_id"].astype(str)
+
+        # Ahora convertir timestamp
         df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
         df["hour"] = df["timestamp"].dt.hour.fillna(0)
         df["is_night"] = df["hour"].apply(lambda h: 1 if h < 7 or h > 20 else 0)
-
-        def generar_event_id(row):
-            base = f"{row['src_ip']}_{row['dest_ip']}_{row['timestamp']}"
-            return hashlib.md5(base.encode()).hexdigest()
-
-        df["event_id"] = df.apply(generar_event_id, axis=1)
     else:
         df["hour"] = 0
         df["is_night"] = 0
@@ -117,8 +114,8 @@ def preprocess_data(events):
 
     return df
 
-async def main():
-    events = await fetch_suricata_data()
+async def main(train_only=False):
+    events = await fetch_suricata_data(train_only)
     df = preprocess_data(events)
 
     if df is not None:
@@ -128,4 +125,6 @@ async def main():
         print("[ML] ⚠ No se generó ningún archivo CSV.")
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    import sys
+    train_only = "--train_only" in sys.argv
+    asyncio.run(main(train_only=train_only))

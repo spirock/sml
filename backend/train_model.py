@@ -38,6 +38,7 @@ if not os.path.exists(DATA_PATH):
     exit(1)
 
 df = pd.read_csv(DATA_PATH)
+df_original = df.copy()
 
 # Verificar si hay valores NaN o datos faltantes
 if df.isnull().values.any():
@@ -84,21 +85,23 @@ try:
     total_anomalies = (predictions == -1).sum()
     print(f"[TM] ⚠ Total de anomalías detectadas: {total_anomalies} de {len(X)} eventos.")
 
-    # Agregar columnas originales para análisis
-    if "timestamp" in df.columns:
-        X["timestamp"] = df["timestamp"]
-    if "src_ip" in df.columns:
-        X["src_ip"] = df["src_ip"]
-    if "dest_ip" in df.columns:
-        X["dest_ip"] = df["dest_ip"]
+    # Agregar resultados al DataFrame original (NO al X normalizado)
+    result_df = pd.DataFrame()
 
-    # Agregar los resultados al DataFrame
-    X["anomaly_score"] = anomaly_scores
-    X["prediction"] = predictions
+    # Mantener campos clave
+    for col in ["proto", "src_port", "dest_port", "alert_severity", "packet_length",
+                "hour", "is_night", "ports_used", "conn_per_ip", "event_id",
+                "src_ip", "dest_ip", "timestamp"]:
+        if col in df_original.columns:
+            result_df[col] = df_original[col]
 
-    # Guardar resultados en un CSV para análisis
+    # Añadir resultados del modelo
+    result_df["anomaly_score"] = anomaly_scores
+    result_df["prediction"] = predictions
+
+    # Guardar en CSV
     result_file = "/app/models/suricata_anomaly_analysis.csv"
-    X.to_csv(result_file, index=False)
+    result_df.to_csv(result_file, index=False)
     print(f"[TM] ✅ Resultados guardados en {result_file}")
 except Exception as e:
     print(f"[TM] ❌ Error al entrenar el modelo: {e}")
