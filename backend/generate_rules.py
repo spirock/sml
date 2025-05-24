@@ -314,8 +314,13 @@ async def generate_suricata_rules():
                 except Exception as e:
                     print(f"[GR] ⚠ Error generando regla para IP {ip}: {e}")
 
-        # 7. Generar nuevas reglas evitando duplicados
+        # 7. Generar nuevas reglas evitando duplicados y reglas redundantes (mismo src_ip, dest_ip, dest_port)
+        seen_combinations = set()
         for _, event in anomalies.iterrows():
+            key = (event["src_ip"], event["dest_ip"], event["dest_port"])
+            if key in seen_combinations:
+                continue
+            seen_combinations.add(key)
             if pd.notna(event["src_ip"]) and pd.notna(event["dest_ip"]):
                 rule = generate_rule(event)
                 print(f"[GR] ➕ Posible nueva regla:\n{rule}")
