@@ -62,10 +62,7 @@ def load_resources():
     
     model = joblib.load(MODEL_PATH)
     print("✔ Modelo cargado correctamente")
-    #print(model)
-    #print(model.get_params())
-    #print(model.feature_names_in_)
-    #print("[GR] 📋 Modelo espera:", list(model.feature_names_in_))
+
     df_processed = pd.read_csv(DATA_PATH)
 
     # 🔄 Renombrar columnas si vienen con puntos del CSV
@@ -291,7 +288,7 @@ async def generate_suricata_rules():
             port_scan_ips[row["src_ip"]].add(row["src_port"])
 
         for ip, ports in port_scan_ips.items():
-            if len(ports) > 50:  # Umbral de escaneo de puertos
+            if len(ports) > 10:  # Umbral de escaneo de puertos
                 try:
                     ip_str = str(ipaddress.ip_address(ip))
                     rule_base = f"drop ip {ip_str} any -> any any"

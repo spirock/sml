@@ -44,9 +44,13 @@ def evaluar_modelo():
         return
     y_score = df[score_col]
 
-    precision = precision_score(y_true, y_pred)
-    recall = recall_score(y_true, y_pred)
-    f1 = f1_score(y_true, y_pred)
+    unique_labels = set(y_true)
+    average_type = 'binary' if unique_labels <= {0, 1} else 'weighted'
+    print(f"🔍 Tipo de clasificación detectado: {'Binaria' if average_type == 'binary' else 'Multiclase'}")
+
+    precision = precision_score(y_true, y_pred, average=average_type)
+    recall = recall_score(y_true, y_pred, average=average_type)
+    f1 = f1_score(y_true, y_pred, average=average_type)
     auc = roc_auc_score(y_true, y_score)
 
     print("✅ Evaluación completada:")
