@@ -19,11 +19,6 @@ async def generate_ground_truth_from_mongo():
 
     print("🔍 Extrayendo eventos del modo entrenamiento (normal o anomaly)...")
 
-    training_label = config.get("label", None)
-    if training_label not in ["normal", "anomaly"]:
-        print("⚠ La configuración no contiene 'training_label' válido (normal o anomaly).")
-        return
-
     query = {"training_mode": True}
     projection = {
         "timestamp": 1,
@@ -37,7 +32,8 @@ async def generate_ground_truth_from_mongo():
         "hour": 1,
         "is_night": 1,
         "ports_used": 1,
-        "conn_per_ip": 1
+        "conn_per_ip": 1,
+        "training_label": 1
     }
 
     cursor = collection.find(query, projection)
@@ -49,8 +45,14 @@ async def generate_ground_truth_from_mongo():
     df = pd.DataFrame(events)
     df["event_id"] = df["_id"].astype(str)
 
-    df["anomaly_score"] = 1.0 if training_label == "anomaly" else -1.0
-    df["label"] = 1 if training_label == "anomaly" else 0
+    def assign_anomaly_score(label):
+        return 1.0 if label == "anomaly" else -1.0
+
+    def assign_label(label):
+        return 1 if label == "anomaly" else 0
+
+    df["anomaly_score"] = df["training_label"].apply(assign_anomaly_score)
+    df["label"] = df["training_label"].apply(assign_label)
 
     os.makedirs(os.path.dirname(GROUND_TRUTH_PATH), exist_ok=True)
     try:
