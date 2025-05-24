@@ -154,12 +154,25 @@ def load_existing_rules():
 def generate_rule(event):
     """Genera una regla Suricata individual más robusta y detallada."""
     try:
+        # Dirección IP de origen convertida en formato estándar (string)
         src_ip = str(ipaddress.ip_address(event["src_ip"]))
+
+        # Dirección IP de destino convertida en formato estándar (string)
         dest_ip = str(ipaddress.ip_address(event["dest_ip"]))
+
+        # Protocolo de red (e.g., tcp, udp, icmp); se usa "ip" como valor por defecto
         proto = str(event.get("proto", "ip")).lower()
+
+        # Puerto de origen (entero), o 0 si no está presente
         src_port = int(event.get("src_port", 0))
+
+        # Puerto de destino (entero), o 0 si no está presente
         dest_port = int(event.get("dest_port", 0))
+
+        # Nivel de severidad de la alerta (entero), por defecto 1 si no se especifica
         severity = int(event.get("alert_severity", 1))
+
+        # Longitud del paquete capturado (entero), por defecto 0 si no se especifica
         pkt_len = int(event.get("packet_length", 0))
     except (ValueError, ipaddress.AddressValueError):
         return None
@@ -169,7 +182,7 @@ def generate_rule(event):
     severity_str = "HIGH risk" if action == "drop" else "suspicious"
 
     # Crear un SID más robusto basado en múltiples atributos
-    unique_id = f"{src_ip}-{dest_ip}-{proto}-{severity}-{pkt_len}-{round(score, 2)}"
+    unique_id = f"{src_ip}-{dest_ip}-{proto}-{dest_port}-{severity}-{pkt_len}-{round(score, 2)}"
     sid = 1000000 + (int(hashlib.sha256(unique_id.encode()).hexdigest(), 16) % 900000)
 
     return (
