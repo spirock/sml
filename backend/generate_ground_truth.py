@@ -44,7 +44,8 @@ async def generate_ground_truth_from_mongo():
 
     df = pd.DataFrame(events)
     df["event_id"] = df["_id"].astype(str)
-
+    df = df.drop(columns=["_id"])  # Elimina la columna _id
+    
     def assign_anomaly_score(label):
         return 1.0 if label == "anomaly" else -1.0
 

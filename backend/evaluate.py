@@ -9,8 +9,8 @@ def evaluar_modelo():
     print("📊 Evaluando el rendimiento del modelo con base en el ground truth...")
 
     try:
-        ground_truth = pd.read_csv(GROUND_TRUTH_PATH)
-        model_output = pd.read_csv(MODEL_OUTPUT_PATH)
+        ground_truth = pd.read_csv(GROUND_TRUTH_PATH, dtype={"event_id": str})
+        model_output = pd.read_csv(MODEL_OUTPUT_PATH, dtype={"event_id": str})
     except Exception as e:
         print(f"❌ Error al cargar archivos: {e}")
         return

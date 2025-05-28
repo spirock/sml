@@ -54,6 +54,8 @@ df.fillna(0, inplace=True)
 
 label_column = "label_num"
 X = df.drop(columns=["timestamp", "src_ip", "dest_ip", "label_text", label_column], errors="ignore")
+# Nota: event_id no se incluye en el entrenamiento ya que representa un identificador único de MongoDB (ObjectId),
+# no aporta valor predictivo y podría sesgar el modelo. Se conserva solo en los resultados para trazabilidad.
 y = df[label_column] if label_column in df.columns else None
 
 # Crear la carpeta models/ si no existe
