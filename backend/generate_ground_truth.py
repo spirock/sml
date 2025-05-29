@@ -12,10 +12,10 @@ async def generate_ground_truth_from_mongo():
     Añade campos de predicción simulada y etiqueta tipo.
     """
     collection = db["events"]
-    config = await db["config"].find_one({"_id": "mode"})
-    if not config or not config.get("value", False):
-        print("🚫 El modo entrenamiento no está activo. No se generará ground_truth.")
-        return
+    #config = await db["config"].find_one({"_id": "mode"})
+    #if not config or not config.get("value", False):
+    #    print("🚫 El modo entrenamiento no está activo. No se generará ground_truth.")
+    #    return
 
     print("🔍 Extrayendo eventos del modo entrenamiento (normal o anomaly)...")
 
