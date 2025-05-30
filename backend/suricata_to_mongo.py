@@ -75,6 +75,7 @@ async def main():
         config = await config_collection.find_one({"_id": "mode"})
         is_training = config and config.get("value", False)
         training_label = config.get("label") if is_training else "unknown"
+        session_hash = config.get("session_hash") if is_training else None
 
         # Definir comportamiento según modo entrenamiento
         if is_training:
@@ -99,7 +100,8 @@ async def main():
             "timestamp": event.get("timestamp", "Desconocido"),
             "event_type": event.get("event_type"),
             "training_mode": is_training,
-            "training_label": training_label
+            "training_label": training_label,
+            "training_session" : session_hash
         }
 
 

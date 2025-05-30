@@ -19,7 +19,29 @@ async def generate_ground_truth_from_mongo():
 
     print("🔍 Extrayendo eventos del modo entrenamiento (normal o anomaly)...")
 
-    query = {"training_mode": True}
+        # Obtener sesiones disponibles
+    sessions = await collection.distinct("training_session", {"training_mode": True})
+    if not sessions:
+        print("⚠ No se encontraron sesiones de entrenamiento activas.")
+        return
+
+    print("🔢 Selecciona una sesión de entrenamiento para generar el ground_truth:")
+    for idx, sess in enumerate(sessions):
+        print(f"{idx + 1}. {sess}")
+    
+    try:
+        choice = int(input("Selecciona una opción (número): "))
+        selected_session = sessions[choice - 1]
+    except (ValueError, IndexError):
+        print("❌ Opción inválida.")
+        return
+
+    print(f"🔍 Extrayendo eventos de la sesión: {selected_session}")
+
+    query = {
+        "training_mode": True,
+        "training_session": selected_session
+    }
     projection = {
         "timestamp": 1,
         "src_ip": 1,
@@ -47,13 +69,13 @@ async def generate_ground_truth_from_mongo():
     df = df.drop(columns=["_id"])  # Elimina la columna _id
     
     def assign_anomaly_score(label):
-        return 1.0 if label == "anomaly" else -1.0
+        return -1.0 if label == "anomaly" else 0
 
-    def assign_label(label):
-        return 1 if label == "anomaly" else 0
+    def prediction(label):
+        return -1 if label == "anomaly" else 1
 
-    df["anomaly_score"] = df["training_label"].apply(assign_anomaly_score)
-    df["label"] = df["training_label"].apply(assign_label)
+    df["anomaly_score_g"] = df["training_label"].apply(assign_anomaly_score)
+    df["prediction_g"] = df["training_label"].apply(prediction)
 
     os.makedirs(os.path.dirname(GROUND_TRUTH_PATH), exist_ok=True)
     try:

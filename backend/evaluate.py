@@ -25,7 +25,7 @@ def evaluar_modelo():
         print(f"❌ El archivo de salida del modelo no contiene las columnas esperadas: {missing_columns}")
         return
 
-    expected_gt_columns = {"event_id", "label"}
+    expected_gt_columns = {"event_id", "prediction_g"}
     missing_gt_columns = expected_gt_columns - set(ground_truth.columns)
     if missing_gt_columns:
         print(f"❌ El archivo ground_truth.csv no contiene las columnas esperadas: {missing_gt_columns}")
@@ -35,7 +35,7 @@ def evaluar_modelo():
     print(f"🔍 Total eventos combinados: {len(df)}")
     print(df.head())
 
-    y_true = df["label"]
+    y_true = df["prediction_g"]
     y_pred = df["prediction"]
     score_col = "anomaly_score_x" if "anomaly_score_x" in df.columns else "anomaly_score"
     if score_col not in df.columns:

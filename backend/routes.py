@@ -8,8 +8,14 @@ import numpy as np
 from db_connection import db
 from datetime import datetime
 import socket
-from fastapi import APIRouter, BackgroundTasks
+from fastapi import APIRouter, BackgroundTasks, HTTPException 
+from hashlib import sha256
+import time
+
 from generate_rules import generate_suricata_rules  # 👈 Asegúrate que el nombre y la ruta sean correctos
+
+
+
 router = APIRouter()
 
 LOG_FILE = "/var/log/suricata/eve.json"
@@ -243,18 +249,48 @@ def get_training_mode():
             "label": "undefined"
         }
 
+
 @router.post("/training-mode/on")
-def activate_training_mode(label: str = Query(..., description="Tipo de entrenamiento: 'normal' o 'anomaly'")):
+async def activate_training_mode(
+    label: str = Query(..., description="Tipo de entrenamiento: 'normal' o 'anomaly'"),
+    new_hash: bool = Query(False, description="¿Desea generar un nuevo hash de entrenamiento?")
+):
     if label not in ["normal", "anomaly"]:
-        return {"error": "Etiqueta inválida. Usa 'normal' o 'anomaly'"}
+        raise HTTPException(status_code=400, detail="Etiqueta inválida. Usa 'normal' o 'anomaly'")
+
     config_collection = db["config"]
-    config_collection.update_one(
+    config = await config_collection.find_one({"_id": "mode"}) or {}
+
+    current_hash = config.get("session_hash")
+
+    if current_hash and not new_hash:
+        return {
+            "message": "Modo entrenamiento ya activado con hash existente.",
+            "session_hash": current_hash,
+            "label": config.get("label", label),
+            "nota": "Si deseas generar un nuevo hash, añade '?new_hash=true' en la URL."
+        }
+
+    # Generar nuevo hash
+    hash_input = f"{label}-{time.time()}".encode()
+    session_hash = sha256(hash_input).hexdigest()[:16]
+
+    await config_collection.update_one(
         {"_id": "mode"},
-        {"$set": {"value": True, "label": label}},
+        {
+            "$set": {
+                "value": True,
+                "label": label,
+                "session_hash": session_hash
+            }
+        },
         upsert=True
     )
-    return {"message": f"Modo entrenamiento activado como '{label}'"}
 
+    return {
+        "message": f"Modo entrenamiento activado como '{label}' con nuevo hash.",
+        "session_hash": session_hash
+    }
 @router.post("/training-mode/off")
 def deactivate_training_mode():
     config_collection = db["config"]

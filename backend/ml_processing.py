@@ -27,9 +27,35 @@ COLLECTION_NAME = "events"
 
 async def fetch_suricata_data(train_only=False):
     collection = db[COLLECTION_NAME]
-    query = {"training_mode": True} if train_only else {}
+
+    if train_only:
+        # Buscar sesiones únicas
+        sessions = await collection.distinct("training_session", {"training_mode": True})
+        if not sessions:
+            print("[ML] ⚠ No se encontraron sesiones de entrenamiento.")
+            return []
+
+        print("🔢 Selecciona una sesión de entrenamiento:")
+        for i, sess in enumerate(sessions):
+            print(f"{i + 1}. {sess}")
+
+        try:
+            index = int(input("Escribe el número de la sesión: ")) - 1
+            selected = sessions[index]
+        except (ValueError, IndexError):
+            print("❌ Selección inválida.")
+            return []
+
+        query = {
+            "training_mode": True,
+            "training_session": selected
+        }
+        print(f"[ML] ✅ Usando la sesión: {selected}")
+    else:
+        query = {}
+
     cursor = collection.find(query)
-    events = await cursor.to_list(length=1000)  # Tomar hasta 1000 eventos
+    events = await cursor.to_list(length=1000)
     print(f"[ML] Se encontraron {len(events)} eventos en MongoDB.")
     return events
 
