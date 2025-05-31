@@ -264,10 +264,17 @@ async def activate_training_mode(
     current_hash = config.get("session_hash")
 
     if current_hash and not new_hash:
+        # Actualizar la etiqueta si ha cambiado
+        if config.get("label") != label:
+            await config_collection.update_one(
+                {"_id": "mode"},
+                {"$set": {"label": label}}
+            )
+
         return {
             "message": "Modo entrenamiento ya activado con hash existente.",
             "session_hash": current_hash,
-            "label": config.get("label", label),
+            "label": label,
             "nota": "Si deseas generar un nuevo hash, añade '?new_hash=true' en la URL."
         }
 
@@ -291,6 +298,9 @@ async def activate_training_mode(
         "message": f"Modo entrenamiento activado como '{label}' con nuevo hash.",
         "session_hash": session_hash
     }
+
+
+
 @router.post("/training-mode/off")
 def deactivate_training_mode():
     config_collection = db["config"]
