@@ -268,7 +268,7 @@ async def activate_training_mode(
         if config.get("label") != label:
             await config_collection.update_one(
                 {"_id": "mode"},
-                {"$set": {"label": label}}
+                {"$set": {"label": label,"value": True}}
             )
 
         return {

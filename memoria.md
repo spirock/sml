@@ -42,7 +42,7 @@ Detección de Amenazas en Redes mediante Machine Learning y Suricata
   El proceso de desarrollo se ha dividido en varias fases bien estructuradas, orientadas a garantizar una detección efectiva y automatizada de amenazas:
 
   🔹 Recolección de Datos  
-  Se diseñó una red de laboratorio virtual en VirtualBox con la siguiente infraestructura:
+   Se diseñó una red de laboratorio virtual en VirtualBox con la siguiente infraestructura:
 
   - Sensor: Ubuntu Server con Suricata.
   - Clientes: Una máquina Debian y una Windows generando tráfico legítimo.
@@ -51,23 +51,23 @@ Detección de Amenazas en Redes mediante Machine Learning y Suricata
   Los logs (`eve.json`) generados por Suricata se insertan automáticamente en MongoDB usando el script `suricata_to_mongo.py`.
 
   🔹 Modo de Entrenamiento Manual  
-  El sistema incluye un modo "training" que puede activarse mediante un endpoint de la API (`/toggle-training`). Cuando este modo está habilitado, los ataques generados manualmente (por ejemplo, desde Kali Linux) son detectados por Suricata, y los eventos generados se etiquetan explícitamente como anómalos (`label: 1`). Esta información etiquetada se almacena en MongoDB, sirviendo como fuente de datos valiosa para entrenar el modelo. Gracias a este enfoque supervisado, se logra mejorar progresivamente la capacidad del sistema para reconocer patrones maliciosos con mayor precisión. El etiquetado manual permite ajustar el sistema en función de distintos tipos de amenazas simuladas, consolidando una base sólida para el análisis.
+   El sistema incluye un modo "training" que puede activarse mediante un endpoint de la API (`/toggle-training`). Cuando este modo está habilitado, los ataques generados manualmente (por ejemplo, desde Kali Linux) son detectados por Suricata, y los eventos generados se etiquetan explícitamente como anómalos (`label: 1`). Esta información etiquetada se almacena en MongoDB, sirviendo como fuente de datos valiosa para entrenar el modelo. Gracias a este enfoque supervisado, se logra mejorar progresivamente la capacidad del sistema para reconocer patrones maliciosos con mayor precisión. El etiquetado manual permite ajustar el sistema en función de distintos tipos de amenazas simuladas, consolidando una base sólida para el análisis.
 
   🔹 Preprocesamiento y Análisis  
-  El módulo `ml_processing.py` transforma los eventos en vectores numéricos:
+   El módulo `ml_processing.py` transforma los eventos en vectores numéricos:
 
   - Convierte IPs, puertos, protocolos, severidad, longitud de paquetes y hora en características normalizadas.
   - Los datos procesados se exportan a `suricata_anomaly_analysis.csv` y se marcan en MongoDB como procesados.
 
   🔹 Entrenamiento del Modelo  
-  El módulo `train_model.py` entrena el modelo `IsolationForest` con tráfico etiquetado como normal:
+   El módulo `train_model.py` entrena el modelo `IsolationForest` con tráfico etiquetado como normal:
 
   - El modelo detecta outliers sin necesidad de etiquetas manuales.
   - Se calcula el `anomaly_score` y se etiqueta cada evento (`label: 0` normal, `1` anómalo).
   - El entrenamiento se puede activar o desactivar dinámicamente mediante la API REST con la ruta `/toggle-training`.
 
   🔹 Generación de Reglas  
-  El módulo `generate_rules.py` crea reglas Suricata automáticamente:
+   El módulo `generate_rules.py` crea reglas Suricata automáticamente:
 
   - Se generan reglas tipo `alert` o `drop` con IP, puerto, score y severidad.
   - Se evita la duplicación mediante hash SHA-256 y control por `sid`.
@@ -77,17 +77,30 @@ Detección de Amenazas en Redes mediante Machine Learning y Suricata
     ```
 
   🔹 Implementación y Monitoreo  
-  El sistema completo se orquesta desde `main.py`:
+   El sistema completo se orquesta desde `main.py`:
 
   - Secuencia: Ingesta → Procesamiento → Entrenamiento → Generación de reglas → Recarga automática.
   - `log_watcher.py` vigila MongoDB en tiempo real para disparar la generación de nuevas reglas si se detectan anomalías.
   - Las reglas generadas se aplican sin reiniciar Suricata gracias a `suricatasc -c reload-rules`.
 
   🔹 Evaluación del Rendimiento  
-  Se utiliza `evaluate.py` junto con el archivo `ground_truth.csv` para comparar resultados del modelo:
+   Se utiliza `evaluate.py` junto con el archivo `ground_truth.csv` para comparar resultados del modelo:
 
   - Se calculan métricas clave como precisión, recall, F1-score y ROC AUC.
   - El archivo `evaluate.py` combina los eventos detectados con el ground truth y permite validar objetivamente la efectividad del sistema.
+
+  3.3.1 Características utilizadas para el entrenamiento del modelo
+
+Para alimentar el modelo de aprendizaje automático (Isolation Forest), se realizó un proceso de extracción y transformación de datos con el objetivo de convertir los eventos de red en vectores numéricos significativos. Las características seleccionadas fueron:
+• src_ip y dest_ip: Direcciones IP de origen y destino, convertidas a enteros para poder ser interpretadas por el modelo.
+• proto: Protocolo de red (TCP, UDP, ICMP…), codificado de forma numérica.
+• src_port y dest_port: Puertos involucrados en la conexión, tanto de origen como de destino.
+• alert_severity: Nivel de severidad de la alerta detectada por Suricata.
+• packet_length: Longitud del paquete capturado.
+• hour: Hora del día en que se generó el evento, útil para identificar patrones por franja horaria.
+• is_night: Indicador binario que marca si el evento ocurrió en horario nocturno (antes de las 07:00 o después de las 20:00).
+• ports_used: Número de puertos únicos utilizados por cada IP de origen.
+• conn_per_ip: Número de conexiones que realizó cada IP de origen.
 
 ---
 
