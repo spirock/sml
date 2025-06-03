@@ -235,18 +235,20 @@ async def get_model_stats():
 
 
 @router.get("/training-mode")
-def get_training_mode():
+async def get_training_mode():
     config_collection = db["config"]
-    config = config_collection.find_one({"_id": "mode"})
+    config = await config_collection.find_one({"_id": "mode"})
     if config:
         return {
             "value": config.get("value", False),
-            "label": config.get("label", "undefined")
+            "label": config.get("label", "undefined"),
+            "session_hash": config.get("session_hash", "undefined")
         }
     else:
         return {
             "value": False,
-            "label": "undefined"
+            "label": "undefined",
+            "session_hash": "undefined"
         }
 
 
