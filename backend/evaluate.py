@@ -3,7 +3,16 @@ from sklearn.metrics import precision_score, recall_score, f1_score, roc_auc_sco
 from sklearn.metrics import confusion_matrix
 import seaborn as sns
 import matplotlib.pyplot as plt
-
+import io
+from PIL import Image
+from rich.console import Console
+from rich.panel import Panel
+from rich import print as rprint
+import matplotlib.pyplot as plt
+import numpy as np
+import matplotlib
+from rich.table import Table
+import shutil
 # Rutas de los archivos
 GROUND_TRUTH_PATH = "/app/models/ground_truth.csv"
 MODEL_OUTPUT_PATH = "/app/models/suricata_anomaly_analysis.csv"
@@ -82,19 +91,13 @@ def evaluar_modelo():
 
     # Mostrar la matriz de confusión en consola como tabla colorida (ASCII)
     print("\n📉 Matriz de Confusión (Visualización):\n")
-    import io
-    from PIL import Image
-    from rich.console import Console
-    from rich.panel import Panel
-    from rich import print as rprint
+
 
     try:
-        import matplotlib.pyplot as plt
-        import numpy as np
-        import matplotlib
+
         matplotlib.use('Agg')
-        import shutil
-        from rich.table import Table
+        
+
 
         table = Table(title="Matriz de Confusión")
         table.add_column(" ", justify="right", style="cyan", no_wrap=True)
