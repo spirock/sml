@@ -1,5 +1,8 @@
 import pandas as pd
 from sklearn.metrics import precision_score, recall_score, f1_score, roc_auc_score
+from sklearn.metrics import confusion_matrix
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 # Rutas de los archivos
 GROUND_TRUTH_PATH = "/app/models/ground_truth.csv"
@@ -58,6 +61,24 @@ def evaluar_modelo():
     print(f"  🔹 Recall:        {recall:.2f}")
     print(f"  🔹 F1-Score:      {f1:.2f}")
     print(f"  🔹 AUC-ROC:       {auc:.2f}")
+
+    # Convertir etiquetas a formato binario para la matriz de confusión
+    y_true_bin = [1 if label == 1 else 0 for label in y_true]
+    y_pred_bin = [1 if pred == -1 else 0 for pred in y_pred]
+
+    cm = confusion_matrix(y_true_bin, y_pred_bin)
+    print("\n📊 Matriz de Confusión (formato [TN, FP]\n                          [FN, TP]):")
+    print(cm)
+
+    # Guardar imagen de la matriz de confusión
+    sns.heatmap(cm, annot=True, fmt="d", cmap="Blues",
+                xticklabels=["Pred: Normal", "Pred: Anomaly"],
+                yticklabels=["Real: Normal", "Real: Anomaly"])
+    plt.title("Matriz de Confusión")
+    plt.xlabel("Predicción")
+    plt.ylabel("Real")
+    plt.savefig("/app/models/confusion_matrix.png")
+    plt.close()
 
 if __name__ == "__main__":
     evaluar_modelo()
