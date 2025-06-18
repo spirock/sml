@@ -10,3 +10,4 @@ joblib
 aiofiles
 pymongo
 seaborn
+rich

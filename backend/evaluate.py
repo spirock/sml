@@ -80,5 +80,35 @@ def evaluar_modelo():
     plt.savefig("/app/models/confusion_matrix.png")
     plt.close()
 
+    # Mostrar la matriz de confusión en consola como tabla colorida (ASCII)
+    print("\n📉 Matriz de Confusión (Visualización):\n")
+    import io
+    from PIL import Image
+    from rich.console import Console
+    from rich.panel import Panel
+    from rich import print as rprint
+
+    try:
+        import matplotlib.pyplot as plt
+        import numpy as np
+        import matplotlib
+        matplotlib.use('Agg')
+        import shutil
+        from rich.table import Table
+
+        table = Table(title="Matriz de Confusión")
+        table.add_column(" ", justify="right", style="cyan", no_wrap=True)
+        table.add_column("Pred: Normal", justify="center", style="magenta")
+        table.add_column("Pred: Anomaly", justify="center", style="magenta")
+
+        table.add_row("Real: Normal", str(cm[0][0]), str(cm[0][1]))
+        table.add_row("Real: Anomaly", str(cm[1][0]), str(cm[1][1]))
+
+        console = Console()
+        console.print(table)
+
+    except Exception as e:
+        print(f"⚠ No se pudo renderizar la tabla en consola: {e}")
+
 if __name__ == "__main__":
     evaluar_modelo()
