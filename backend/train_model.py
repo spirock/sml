@@ -100,10 +100,14 @@ try:
     # Añadir resultados del modelo
     result_df["anomaly_score"] = anomaly_scores
     result_df["prediction"] = predictions
+    # Añadir columna label en formato texto ("anomaly"/"normal"), como en otros scripts
+    result_df["label"] = result_df["prediction"].apply(lambda x: "anomaly" if x == -1 else "normal")
 
     # Guardar en CSV
     result_file = "/app/models/suricata_anomaly_analysis.csv"
     result_df.to_csv(result_file, index=False)
     print(f"[TM] ✅ Resultados guardados en {result_file}")
+    # Mostrar conteo de instancias por etiqueta
+    print(result_df["label"].value_counts())
 except Exception as e:
     print(f"[TM] ❌ Error al entrenar el modelo: {e}")

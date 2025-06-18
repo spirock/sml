@@ -100,10 +100,10 @@ def preprocess_data(events):
     def label_anomaly(row):
         if row.get("training_mode") == True:
             label = row.get("training_label")
-            if label == "normal":
-                return 0
-            elif label == "anomaly":
+            if label == "anomaly":
                 return 1
+            elif label == "normal":
+                return 0
         return -1
 
     df["anomaly"] = df.apply(label_anomaly, axis=1)

@@ -44,6 +44,7 @@ def evaluar_modelo():
         return
 
     df = pd.merge(model_output, ground_truth, on="event_id", how="inner")
+    df["prediction"] = df["prediction"].replace(-1, 1)
     print(f"🔍 Total eventos combinados: {len(df)}")
     print(df.head())
 
@@ -71,11 +72,7 @@ def evaluar_modelo():
     print(f"  🔹 F1-Score:      {f1:.2f}")
     print(f"  🔹 AUC-ROC:       {auc:.2f}")
 
-    # Convertir etiquetas a formato binario para la matriz de confusión
-    y_true_bin = [1 if label == 1 else 0 for label in y_true]
-    y_pred_bin = [1 if pred == -1 else 0 for pred in y_pred]
-
-    cm = confusion_matrix(y_true_bin, y_pred_bin)
+    cm = confusion_matrix(y_true, y_pred)
     print("\n📊 Matriz de Confusión (formato [TN, FP]\n                          [FN, TP]):")
     print(cm)
 
@@ -119,7 +116,7 @@ def analizar_falsos_negativos(df):
     if "prediction" in df.columns and "prediction_g" in df.columns:
         falsos_negativos = df[
             (df["prediction_g"] == 1) & 
-            (df["prediction"] == 0)
+            (df["prediction"] == 0)  # 0 equivale a normal tras la normalización
         ]
         print(f"\n🔎 Total falsos negativos encontrados: {len(falsos_negativos)}")
         falsos_negativos.to_csv("/app/models/falsos_negativos.csv", index=False)

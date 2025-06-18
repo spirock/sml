@@ -69,10 +69,11 @@ async def generate_ground_truth_from_mongo():
     df = df.drop(columns=["_id"])  # Elimina la columna _id
     
     def assign_anomaly_score(label):
+        # Asigna un puntaje negativo para anomalías y 0 para normales
         return -1.0 if label == "anomaly" else 0
 
     def prediction(label):
-        return -1 if label == "anomaly" else 1
+        return 1 if label == "anomaly" else 0
 
     df["anomaly_score_g"] = df["training_label"].apply(assign_anomaly_score)
     df["prediction_g"] = df["training_label"].apply(prediction)
