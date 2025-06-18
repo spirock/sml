@@ -23,6 +23,7 @@ import asyncio
 import hashlib
 import aiofiles
 from db_connection import db
+from constants import LABEL_NORMAL, LABEL_ANOMALY
 
 LOG_FILE = "/var/log/suricata/eve.json"
 
@@ -74,7 +75,7 @@ async def main():
     async for event in monitor_log_file():
         config = await config_collection.find_one({"_id": "mode"})
         is_training = config and config.get("value", False)
-        training_label = config.get("label") if is_training else "unknown"
+        training_label = config.get("label", LABEL_NORMAL) if is_training else "unknown"
         session_hash = config.get("session_hash") if is_training else None
 
         # Definir comportamiento según modo entrenamiento

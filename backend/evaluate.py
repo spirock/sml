@@ -13,6 +13,7 @@ import numpy as np
 import matplotlib
 from rich.table import Table
 import shutil
+from constants import ANOMALY_PREDICTION
 # Rutas de los archivos
 GROUND_TRUTH_PATH = "/app/models/ground_truth.csv"
 MODEL_OUTPUT_PATH = "/app/models/suricata_anomaly_analysis.csv"
@@ -44,7 +45,7 @@ def evaluar_modelo():
         return
 
     df = pd.merge(model_output, ground_truth, on="event_id", how="inner")
-    df["prediction"] = df["prediction"].replace(-1, 1)
+    df["prediction"] = np.where(df["prediction"] == ANOMALY_PREDICTION, 1, 0)
     print(f"🔍 Total eventos combinados: {len(df)}")
     print(df.head())
 

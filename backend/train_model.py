@@ -26,6 +26,7 @@ import numpy as np
 from sklearn.ensemble import IsolationForest
 import joblib
 import os
+from constants import ANOMALY_PREDICTION
 
 # Rutas de los archivos
 DATA_PATH = "/app/models/suricata_preprocessed.csv"
@@ -82,27 +83,24 @@ try:
     # Obtener los puntajes de anomalía
     anomaly_scores = model.decision_function(X)
     predictions = model.predict(X)
-
-    # Contar anomalías detectadas
-    total_anomalies = (predictions == -1).sum()
-    print(f"[TM] ⚠ Total de anomalías detectadas: {total_anomalies} de {len(X)} eventos.")
-
-    # Agregar resultados al DataFrame original (NO al X normalizado)
+    # Convertimos la predicción a binaria para consistencia (1 = anomalía, 0 = normal)
     result_df = pd.DataFrame()
-
     # Mantener campos clave
     for col in ["proto", "src_port", "dest_port", "alert_severity", "packet_length",
                 "hour", "is_night", "ports_used", "conn_per_ip", "event_id",
                 "src_ip", "dest_ip", "timestamp"]:
         if col in df_original.columns:
             result_df[col] = df_original[col]
-
     # Añadir resultados del modelo
     result_df["anomaly_score"] = anomaly_scores
     result_df["prediction"] = predictions
+    # Convertimos la predicción a binaria para consistencia (1 = anomalía, 0 = normal)
+    result_df["is_anomaly"] = (predictions == ANOMALY_PREDICTION).astype(int)
     # Añadir columna label en formato texto ("anomaly"/"normal"), como en otros scripts
-    result_df["label"] = result_df["prediction"].apply(lambda x: "anomaly" if x == -1 else "normal")
-
+    result_df["label"] = result_df["prediction"].apply(lambda x: "anomaly" if x == ANOMALY_PREDICTION else "normal")
+    # Contar anomalías detectadas
+    total_anomalies = (predictions == ANOMALY_PREDICTION).sum()
+    print(f"[TM] ⚠ Total de anomalías detectadas: {total_anomalies} de {len(X)} eventos.")
     # Guardar en CSV
     result_file = "/app/models/suricata_anomaly_analysis.csv"
     result_df.to_csv(result_file, index=False)

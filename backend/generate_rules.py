@@ -47,6 +47,9 @@ from pathlib import Path
 import hashlib
 from bson import ObjectId
 
+# Importar constantes para umbral de anomalía y predicción
+from constants import ANOMALY_THRESHOLD, ANOMALY_PREDICTION
+
 
 # 📌 Configuración de rutas
 RULES_FILE = "/var/lib/suricata/rules/sml.rules"
@@ -178,7 +181,7 @@ def generate_rule(event):
         return None
 
     score = event.get("anomaly_score", 0.0)
-    action = "drop" if score <= -0.2 else "alert"
+    action = "drop" if score <= ANOMALY_THRESHOLD else "alert"
     severity_str = "HIGH risk" if action == "drop" else "suspicious"
 
     # Crear un SID más robusto basado en múltiples atributos
@@ -282,7 +285,7 @@ async def generate_suricata_rules():
         df_events["anomaly_score"] = model.decision_function(df_numeric)
         df_events["prediction"] = model.predict(df_numeric)
         print("[GR] Conteo de predicciones:", df_events["prediction"].value_counts().to_dict())
-        anomalies = df_events[df_events["prediction"] == -1].copy()
+        anomalies = df_events[df_events["prediction"] == ANOMALY_PREDICTION].copy()
 
         
         if anomalies.empty:
