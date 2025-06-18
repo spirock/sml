@@ -70,7 +70,7 @@ def ip_to_int(ip):
     except ValueError:
         print(f"[ML] ⚠ Error: No se pudo convertir la IP -> {ip}")
         return 0
-    
+
 def preprocess_data(events):
     df = pd.DataFrame(events)
 
@@ -79,6 +79,31 @@ def preprocess_data(events):
         return None
 
     print("[ML] Procesando los datos de Suricata...")
+
+    def add_port_entropy_feature(df):
+        """Calcula la entropía de puertos destino por IP origen (detecta scans)"""
+        port_distribution = df.groupby('src_ip')['dest_port'].value_counts(normalize=True).unstack(fill_value=0)
+        entropy = port_distribution.apply(lambda x: -np.sum(x * np.log(x + 1e-10)), axis=1)
+        df['port_entropy'] = df['src_ip'].map(entropy)
+        return df
+
+    def add_failed_connections_feature(df):
+        """Calcula el ratio de conexiones con alertas severas"""
+        if 'alert_severity' in df.columns:
+            df['failed_ratio'] = df.groupby('src_ip')['alert_severity'].transform(lambda x: (x > 0).mean())
+        else:
+            df['failed_ratio'] = 0
+        return df
+
+    def add_temporal_anomaly_feature(df):
+        """Identifica actividad en horarios inusuales para la IP"""
+        if 'hour' in df.columns:
+            ip_hour_mode = df.groupby('src_ip')['hour'].agg(lambda x: x.mode()[0])
+            df['hour_anomaly'] = df.apply(
+                lambda row: 1 if abs(row['hour'] - ip_hour_mode.get(row['src_ip'], 0)) > 3 else 0,
+                axis=1
+            )
+        return df
 
     # Enriquecer con nuevas features
     if "timestamp" in df.columns:
@@ -96,6 +121,10 @@ def preprocess_data(events):
     df["ports_used"] = df.groupby("src_ip")["dest_port"].transform("nunique")
     df["conn_per_ip"] = df.groupby("src_ip")["dest_ip"].transform("count")
 
+    df = add_port_entropy_feature(df)
+    df = add_failed_connections_feature(df)
+    df = add_temporal_anomaly_feature(df)
+
     # Añadir columna 'anomaly' basado en training_mode y training_label
     def label_anomaly(row):
         if row.get("training_mode") == True:
@@ -110,7 +139,9 @@ def preprocess_data(events):
 
     selected_columns = [
         "src_ip", "dest_ip", "proto", "src_port", "dest_port", "alert_severity",
-        "packet_length", "hour", "is_night", "ports_used", "conn_per_ip", "anomaly", "event_id"
+        "packet_length", "hour", "is_night", "ports_used", "conn_per_ip",
+        "port_entropy", "failed_ratio", "hour_anomaly",
+        "anomaly", "event_id"
     ]
 
     # Verificar si las columnas existen antes de seleccionarlas
