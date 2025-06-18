@@ -113,5 +113,21 @@ def evaluar_modelo():
     except Exception as e:
         print(f"⚠ No se pudo renderizar la tabla en consola: {e}")
 
+    analizar_falsos_negativos(df)
+
+def analizar_falsos_negativos(df):
+    if "prediction" in df.columns and "prediction_g" in df.columns:
+        falsos_negativos = df[
+            (df["prediction_g"] == 1) & 
+            (df["prediction"] == 0)
+        ]
+        print(f"\n🔎 Total falsos negativos encontrados: {len(falsos_negativos)}")
+        falsos_negativos.to_csv("/app/models/falsos_negativos.csv", index=False)
+        print("📁 Falsos negativos guardados en: /app/models/falsos_negativos.csv")
+        print("\n📊 Análisis básico de falsos negativos:")
+        print(falsos_negativos[["proto_x", "src_port_x", "dest_port_x", "alert_severity_x", "packet_length_x"]].describe())
+    else:
+        print("⚠ Columnas necesarias no disponibles para análisis de falsos negativos.")
+
 if __name__ == "__main__":
     evaluar_modelo()
