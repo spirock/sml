@@ -262,10 +262,10 @@ async def generate_suricata_rules():
         expected_columns = model.feature_names_in_ if hasattr(model, "feature_names_in_") else list(df_numeric.columns[:model.n_features_in_])
         df_numeric = df_numeric[[col for col in expected_columns if col in df_numeric.columns]]
 
-        # Cambiado para verificar columnas contra df_events en lugar de df_numeric
+        # Cambiado para verificar columnas contra df_numeric en lugar de df_events
         expected_cols = list(model.feature_names_in_)
-        print("[GR] Columnas reales en df:", df_events.columns.tolist())
-        missing = [col for col in expected_cols if col not in df_events.columns]
+        print("[GR] Columnas reales en df_numeric:", df_numeric.columns.tolist())
+        missing = [col for col in expected_cols if col not in df_numeric.columns]
         if missing:
             print(f"[GR] ❌ Faltan columnas esperadas: {missing}")
             return
