@@ -108,8 +108,7 @@ def preprocess_data(df, expected_columns):
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce")
         else:
-            print(f"[GR] ⚠️ Columna faltante durante preprocesamiento: {col}")
-            df[col] = 0
+            df[col] = pd.to_numeric(df.get(col, 0), errors="coerce")
 
     return df.fillna(0)[expected_columns]
 
@@ -263,14 +262,14 @@ async def generate_suricata_rules():
         expected_columns = model.feature_names_in_ if hasattr(model, "feature_names_in_") else list(df_numeric.columns[:model.n_features_in_])
         df_numeric = df_numeric[[col for col in expected_columns if col in df_numeric.columns]]
 
-        # ✅ Seleccionar solo las columnas que espera el modelo
-        #expected_cols = ["src_ip", "dest_ip", "proto", "src_port", "dest_port", "alert_severity", "packet_length"]
+        # Cambiado para verificar columnas contra df_events en lugar de df_numeric
         expected_cols = list(model.feature_names_in_)
-        print("[GR] Columnas reales en df_numeric:", df_numeric.columns.tolist())
-        missing = [col for col in expected_cols if col not in df_numeric.columns]
+        print("[GR] Columnas reales en df:", df_events.columns.tolist())
+        missing = [col for col in expected_cols if col not in df_events.columns]
         if missing:
             print(f"[GR] ❌ Faltan columnas esperadas: {missing}")
             return
+
 
         df_numeric = df_numeric[expected_cols]
 
