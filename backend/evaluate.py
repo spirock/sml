@@ -62,6 +62,10 @@ def evaluar_modelo():
     average_type = 'binary' if len(unique_labels) == 2 and unique_labels <= {0, 1} else 'weighted'
     print(f"🔍 Tipo de clasificación detectado: {'Binaria' if average_type == 'binary' else 'Multiclase'}")
 
+    if len(y_true) == 0 or len(y_score) == 0:
+        print("⚠️ No hay datos para calcular precision-recall curve. ¿Tal vez no se combinaron eventos correctamente?")
+        return
+
 
 
     # Curva Precision-Recall
