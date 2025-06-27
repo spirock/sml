@@ -18,6 +18,7 @@ de tráfico normal y detectar anomalías de manera efectiva.
 from motor.motor_asyncio import AsyncIOMotorClient
 import pandas as pd
 import numpy as np
+import ipaddress  # Asegúrate de importar este módulo al inicio del archivo
 import asyncio
 from db_connection import db  # Importar la conexión a MongoDB
 import hashlib
@@ -60,15 +61,11 @@ async def fetch_suricata_data(train_only=False):
     return events
 
 def ip_to_int(ip):
-    """Convierte una dirección IP en formato string a un número entero."""
+    """Convierte una dirección IP (IPv4 o IPv6) a un número entero único."""
     try:
-        if isinstance(ip, str) and ip.count('.') == 3:  # Verifica que sea una IP válida
-            return sum([int(num) << (8 * i) for i, num in enumerate(reversed(ip.split('.')))])
-        else:
-            print(f"[ML] ⚠ Advertencia: IP inválida detectada -> {ip}")
-            return 0  # Asignar 0 si la IP es inválida
+        return int(ipaddress.ip_address(ip))
     except ValueError:
-        print(f"[ML] ⚠ Error: No se pudo convertir la IP -> {ip}")
+        print(f"[ML] ⚠ Advertencia: IP inválida detectada -> {ip}")
         return 0
 
 def preprocess_data(events):
