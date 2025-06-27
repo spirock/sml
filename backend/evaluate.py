@@ -1,6 +1,6 @@
 import pandas as pd
 from sklearn.metrics import precision_score, recall_score, f1_score, roc_auc_score
-from sklearn.metrics import confusion_matrix
+from sklearn.metrics import confusion_matrix,classification_report, precision_recall_curve, average_precision_score
 import seaborn as sns
 import matplotlib.pyplot as plt
 import io
@@ -62,6 +62,18 @@ def evaluar_modelo():
     average_type = 'binary' if len(unique_labels) == 2 and unique_labels <= {0, 1} else 'weighted'
     print(f"🔍 Tipo de clasificación detectado: {'Binaria' if average_type == 'binary' else 'Multiclase'}")
 
+
+
+    # Curva Precision-Recall
+    precision_curve, recall_curve, _ = precision_recall_curve(y_true, y_score)
+    ap_score = average_precision_score(y_true, y_score)
+
+    # Mostrar reporte de clasificación
+    print("\n📋 Reporte de Clasificación:")
+    print(classification_report(y_true, y_pred, target_names=["Normal", "Anomaly"]))
+
+    print(f"🔹 Average Precision Score (AP): {ap_score:.2f}")
+
     precision = precision_score(y_true, y_pred, average=average_type)
     recall = recall_score(y_true, y_pred, average=average_type)
     f1 = f1_score(y_true, y_pred, average=average_type)
@@ -113,19 +125,16 @@ def evaluar_modelo():
 
     analizar_falsos_negativos(df)
 
-def analizar_falsos_negativos(df):
-    if "prediction" in df.columns and "prediction_g" in df.columns:
-        falsos_negativos = df[
-            (df["prediction_g"] == 1) & 
-            (df["prediction"] == 0)  # 0 equivale a normal tras la normalización
-        ]
-        print(f"\n🔎 Total falsos negativos encontrados: {len(falsos_negativos)}")
-        falsos_negativos.to_csv("/app/models/falsos_negativos.csv", index=False)
-        print("📁 Falsos negativos guardados en: /app/models/falsos_negativos.csv")
-        print("\n📊 Análisis básico de falsos negativos:")
-        print(falsos_negativos[["proto_x", "src_port_x", "dest_port_x", "alert_severity_x", "packet_length_x"]].describe())
-    else:
-        print("⚠ Columnas necesarias no disponibles para análisis de falsos negativos.")
+def analyze_false_negatives(df):
+    fn = df[(df['prediction_g']==1) & (df['prediction']==0)]
+    
+    print("\n🔍 Análisis Detallado de Falsos Negativos:")
+    print("Top Protocolos:", fn['proto_x'].value_counts().head(3))
+    print("Distribución de Puertos:")
+    print(fn['dest_port_x'].describe(percentiles=[0.5, 0.9, 0.99]))
+    
+    # Guardar ejemplos críticos
+    fn.nlargest(20, 'anomaly_score_g').to_csv("/app/models/fn_analysis.csv")
 
 if __name__ == "__main__":
     evaluar_modelo()

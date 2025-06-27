@@ -1,3 +1,20 @@
+# --- Funciones auxiliares para reglas contextuales ---
+def gen_sid(event):
+    """Genera un SID único basado en IP y puertos"""
+    unique_str = f"{event['src_ip']}-{event['dest_port']}-{event['proto']}"
+    return 3000000 + int(hashlib.sha256(unique_str.encode()).hexdigest(), 16) % 900000
+
+def generate_contextual_rule(event, historical_data):
+    """Genera reglas basadas en comportamiento histórico"""
+    ip_behavior = historical_data[historical_data['src_ip'] == event['src_ip']]
+    
+    if len(ip_behavior) > 10:
+        port_range = f"{ip_behavior['dest_port'].min()}:{ip_behavior['dest_port'].max()}"
+        return (
+            f"alert {event['proto']} {event['src_ip']} any -> any {port_range} "
+            f'(msg:"Suspicious port range access from {event["src_ip"]}"; sid:{gen_sid(event)};)'
+        )
+    return None
 """
 generate_rules.py
 
@@ -248,6 +265,7 @@ async def generate_suricata_rules():
             return
 
         df_events = pd.DataFrame(events)
+        historical_data = pd.read_csv(DATA_PATH)
         # Renombrar campos a lo que espera el modelo
 
         event_ids = [event["_id"] for event in events if "_id" in event]
@@ -315,6 +333,13 @@ async def generate_suricata_rules():
                         print(f"[GR] 🚨 Regla de escaneo añadida para {ip_str}")
                 except Exception as e:
                     print(f"[GR] ⚠ Error generando regla para IP {ip}: {e}")
+
+        # 6b. Generar reglas contextuales por comportamiento histórico
+        for _, event in anomalies.iterrows():
+            contextual_rule = generate_contextual_rule(event, historical_data)
+            if contextual_rule and contextual_rule not in existing_rules:
+                print(f"[GR] ➕ Regla contextual generada:\n{contextual_rule}")
+                new_rules.append(contextual_rule)
 
         # 7. Generar nuevas reglas evitando duplicados y reglas redundantes (mismo src_ip, dest_ip, dest_port)
         seen_combinations = set()

@@ -22,6 +22,7 @@ import ipaddress  # Asegúrate de importar este módulo al inicio del archivo
 import asyncio
 from db_connection import db  # Importar la conexión a MongoDB
 import hashlib
+from sklearn.preprocessing import RobustScaler
 COLLECTION_NAME = "events"
 
 
@@ -102,6 +103,33 @@ def preprocess_data(events):
             )
         return df
 
+    def add_connection_velocity(df):
+        """Calcula la velocidad de conexiones por IP origen"""
+        if 'timestamp' in df.columns:
+            df['conn_velocity'] = df.groupby('src_ip')['timestamp'].transform(
+                lambda x: x.diff().dt.total_seconds().rolling(5, min_periods=1).mean().fillna(0)
+            )
+        else:
+            df['conn_velocity'] = 0
+        return df
+
+    def add_protocol_behavior(df):
+        """Analiza comportamiento anómalo por protocolo"""
+        if 'packet_length' in df.columns and 'proto' in df.columns:
+            protocol_stats = df.groupby('proto').agg({
+                'packet_length': ['mean', 'std'],
+                'dest_port': 'nunique'
+            }).reset_index()
+            protocol_stats.columns = ['proto', 'proto_pkt_mean', 'proto_pkt_std', 'proto_ports']
+            
+            df = df.merge(protocol_stats, on='proto', how='left')
+            df['pkt_anomaly'] = (
+                (df['packet_length'] - df['proto_pkt_mean']).abs() > 2 * df['proto_pkt_std']
+            ).astype(int)
+        else:
+            df['pkt_anomaly'] = 0
+        return df
+
     # Enriquecer con nuevas features
     if "timestamp" in df.columns:
         # Generar event_id usando _id convertido a string
@@ -121,6 +149,8 @@ def preprocess_data(events):
     df = add_port_entropy_feature(df)
     df = add_failed_connections_feature(df)
     df = add_temporal_anomaly_feature(df)
+    df = add_connection_velocity(df)
+    df = add_protocol_behavior(df)
 
     # Añadir columna 'anomaly' basado en training_mode y training_label
     def label_anomaly(row):
@@ -138,6 +168,7 @@ def preprocess_data(events):
         "src_ip", "dest_ip", "proto", "src_port", "dest_port", "alert_severity",
         "packet_length", "hour", "is_night", "ports_used", "conn_per_ip",
         "port_entropy", "failed_ratio", "hour_anomaly",
+        "conn_velocity", "proto_pkt_mean", "proto_pkt_std", "proto_ports", "pkt_anomaly",
         "anomaly", "event_id"
     ]
 
@@ -161,7 +192,8 @@ def preprocess_data(events):
     # Seleccionar columnas numéricas para normalizar
     numeric_cols = df.select_dtypes(include=[np.number]).columns
     df_numeric = df[numeric_cols]
-    df_normalized = (df_numeric - df_numeric.min()) / (df_numeric.max() - df_numeric.min()).replace(0, 1)
+    scaler = RobustScaler()
+    df_normalized = pd.DataFrame(scaler.fit_transform(df_numeric), columns=df_numeric.columns)
 
     # Combinar con columnas no numéricas (por ejemplo event_id si existe)
     df = pd.concat([df_normalized, df.drop(columns=numeric_cols)], axis=1)

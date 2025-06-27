@@ -27,6 +27,7 @@ from sklearn.ensemble import IsolationForest
 import joblib
 import os
 from constants import ANOMALY_PREDICTION
+import ipaddress
 
 # Rutas de los archivos
 DATA_PATH = "/app/models/suricata_preprocessed.csv"
@@ -39,7 +40,15 @@ if not os.path.exists(DATA_PATH):
     exit(1)
 
 df = pd.read_csv(DATA_PATH)
-df_original = df.copy()
+
+def ip_to_numeric(ip):
+    try:
+        return int(ipaddress.ip_address(ip))
+    except:
+        return 0
+
+df["src_ip"] = df["src_ip"].apply(ip_to_numeric)
+df["dest_ip"] = df["dest_ip"].apply(ip_to_numeric)
 
 # Verificar si hay valores NaN o datos faltantes
 if df.isnull().values.any():
@@ -52,6 +61,8 @@ for col in df.columns:
 
 # Si todavía hay NaN, reemplazarlos con ceros
 df.fillna(0, inplace=True)
+
+df_original = df.copy()
 
 label_column = "label_num"
 X = df.drop(columns=["timestamp", "src_ip", "dest_ip", "label_text", label_column], errors="ignore")
@@ -72,6 +83,7 @@ print("[TM] 🔍 Entrenando modelo Isolation Forest...")
 model = IsolationForest(contamination=0.05, random_state=42)  # 5% de tráfico anómalo
 
 try:
+    print(f"[TM] 🧪 Columnas usadas para entrenamiento: {X.columns.tolist()}")
     model.fit(X)
     # Guardar el modelo en la carpeta persistente
     joblib.dump(model, MODEL_PATH)
@@ -87,8 +99,8 @@ try:
     result_df = pd.DataFrame()
     # Mantener campos clave
     for col in ["proto", "src_port", "dest_port", "alert_severity", "packet_length",
-                "hour", "is_night", "ports_used", "conn_per_ip", "event_id",
-                "src_ip", "dest_ip", "timestamp"]:
+                "hour", "is_night", "ports_used", "conn_per_ip", "port_entropy", "failed_ratio", "hour_anomaly",
+                "event_id", "src_ip", "dest_ip", "timestamp"]:
         if col in df_original.columns:
             result_df[col] = df_original[col]
     # Añadir resultados del modelo
