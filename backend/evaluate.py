@@ -129,7 +129,7 @@ def evaluar_modelo():
 
     analizar_falsos_negativos(df)
 
-def analyze_false_negatives(df):
+def analizar_falsos_negativos(df):
     fn = df[(df['prediction_g']==1) & (df['prediction']==0)]
     
     print("\n🔍 Análisis Detallado de Falsos Negativos:")
