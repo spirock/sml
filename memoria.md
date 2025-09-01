@@ -42,14 +42,74 @@ Detección de Amenazas en Redes mediante Machine Learning y Suricata
 
   El proceso de desarrollo se ha dividido en varias fases bien estructuradas, orientadas a garantizar una detección efectiva y automatizada de amenazas:
 
-  🔹 Recolección de Datos  
-   Se diseñó una red de laboratorio virtual en VirtualBox con la siguiente infraestructura:
+configuracion de red:
+network:
+version: 2
+ethernets:
+enp0s3: # Adaptador NAT
+dhcp4: true
+enp0s8: # Red interna vmnet10
+addresses: [192.168.10.1/24]
+enp0s9: # Red interna vmnet9
+addresses: [192.168.9.1/24]
+enp0s10: # Red sólo anfitrión
+addresses: [192.168.56.10/24]
 
-  - Sensor: Ubuntu Server con Suricata.
-  - Clientes: Una máquina Debian y una Windows generando tráfico legítimo.
-  - Atacante: Kali Linux desde una red externa lanzando escaneos y ataques simulados.
+⸻
 
-  Los logs (`eve.json`) generados por Suricata se insertan automáticamente en MongoDB usando el script `suricata_to_mongo.py`.
+💻 2. Cliente Interno
+
+Simula un PC normal dentro de la red interna protegida.
+
+Configuración en VirtualBox:
+• Adaptador 1: Red interna vmnet10
+• IP manual: 192.168.10.20/24
+• Gateway: 192.168.10.1 (Suricata)
+• DNS: 8.8.8.8
+
+⸻
+
+💻 3. Cliente Comprometido
+
+PC vulnerable dentro de la misma red interna, posible “puerta trasera” para el atacante.
+
+Configuración en VirtualBox:
+• Adaptador 1: Red interna vmnet10
+• IP manual: 192.168.10.30/24
+• Gateway: 192.168.10.1
+• DNS: 8.8.8.8
+
+⸻
+
+🐉 4. Kali Linux (Atacante)
+
+PC que lanza ataques desde fuera de la red interna.
+
+Configuración en VirtualBox:
+• Adaptador 1: Red interna vmnet9
+• IP manual: 192.168.9.100/24
+• Gateway: 192.168.9.1 (Suricata)
+• DNS: 8.8.8.8
+
+⸻
+
+🖥 5. Mac (Host Físico)
+
+Sirve para administrar el Ubuntu Server desde fuera, sin usar la consola de VirtualBox.
+
+Configuración:
+• Usa la interfaz Host-Only creada por VirtualBox (vboxnet0)
+• IP de Suricata para conexión SSH: 192.168.56.10
+• Conexión:
+
+🔹 Recolección de Datos  
+ Se diseñó una red de laboratorio virtual en VirtualBox con la siguiente infraestructura:
+
+- Sensor: Ubuntu Server con Suricata.
+- Clientes: Una máquina Debian y una Windows generando tráfico legítimo.
+- Atacante: Kali Linux desde una red externa lanzando escaneos y ataques simulados.
+
+Los logs (`eve.json`) generados por Suricata se insertan automáticamente en MongoDB usando el script `suricata_to_mongo.py`.
 
 🔹 Modo de Entrenamiento Manual  
  El sistema incluye un modo "training" que puede activarse mediante un endpoint de la API (`/toggle-training`). Cuando este modo está habilitado, se ejecuta un conjunto de scripts —como `advance.py`— para generar ataques simulados desde una máquina atacante (Kali Linux). Estos ataques son detectados por Suricata y etiquetados automáticamente en la base de datos con una sesión de entrenamiento única.
