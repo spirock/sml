@@ -3,3 +3,5 @@ ANOMALY_THRESHOLD = -0.2  # Puntaje para considerar anomalía
 ANOMALY_PREDICTION = -1    # Valor que devuelve IsolationForest para anomalías
 LABEL_NORMAL = "normal"
 LABEL_ANOMALY = "anomaly"
+
+DEFAULT_PERCENTILE = 98  # Percentil por defecto para el umbral de anomalías

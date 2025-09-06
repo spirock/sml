@@ -24,9 +24,16 @@
 import pandas as pd
 import numpy as np
 from sklearn.ensemble import IsolationForest
+from sklearn.metrics import f1_score
 import joblib
 import os
 from constants import ANOMALY_PREDICTION
+try:
+    from constants import LABEL_ANOMALY, LABEL_NORMAL, DEFAULT_PERCENTILE
+except Exception:
+    LABEL_ANOMALY = "anomaly"
+    LABEL_NORMAL = "normal"
+    DEFAULT_PERCENTILE = 0.98
 import ipaddress
 
 # Rutas de los archivos
@@ -65,7 +72,9 @@ df.fillna(0, inplace=True)
 df_original = df.copy()
 
 label_column = "label_num"
-X = df.drop(columns=["timestamp", "src_ip", "dest_ip", "label_text", label_column], errors="ignore")
+# Conjunto de características completo para predicción
+X_full_df = df.drop(columns=["timestamp", "src_ip", "dest_ip", "label_text", label_column], errors="ignore")
+feature_cols = X_full_df.columns.tolist()
 # Nota: event_id no se incluye en el entrenamiento ya que representa un identificador único de MongoDB (ObjectId),
 # no aporta valor predictivo y podría sesgar el modelo. Se conserva solo en los resultados para trazabilidad.
 y = df[label_column] if label_column in df.columns else None
@@ -74,7 +83,7 @@ y = df[label_column] if label_column in df.columns else None
 os.makedirs(MODEL_DIR, exist_ok=True)
 
 # Verificar que no haya columnas vacías antes de entrenar
-if X.shape[1] == 0:
+if X_full_df.shape[1] == 0:
     print("[TM] ❌ Error: No hay columnas en los datos después del preprocesamiento.")
     exit(1)
 
@@ -83,8 +92,19 @@ print("[TM] 🔍 Entrenando modelo Isolation Forest...")
 model = IsolationForest(contamination=0.05, random_state=42)  # 5% de tráfico anómalo
 
 try:
-    print(f"[TM] 🧪 Columnas usadas para entrenamiento: {X.columns.tolist()}")
-    model.fit(X)
+    # Entrenar solo con tráfico normal si existe etiqueta
+    df_train = df.copy()
+    if "training_label" in df_train.columns:
+        df_train = df_train[df_train["training_label"].astype(str).str.lower() == "normal"]
+    elif "label_text" in df_train.columns:
+        df_train = df_train[df_train["label_text"].astype(str).str.lower() == "normal"]
+
+    X_train = df_train[feature_cols].values
+    X_full = X_full_df.values
+
+    print(f"[TM] 🧪 Columnas usadas para entrenamiento: {feature_cols}")
+    print(f"[TM] 🧪 Muestras de entrenamiento: {len(X_train)} / {len(X_full)} totales")
+    model.fit(X_train)
     # Guardar el modelo en la carpeta persistente
     joblib.dump(model, MODEL_PATH)
     print(f"[TM] ✅ Modelo entrenado y guardado en {MODEL_PATH}")
@@ -92,10 +112,49 @@ try:
     # **Evaluación del Modelo**
     print("\n [TM] 📊 Evaluando el modelo...")
 
-    # Obtener los puntajes de anomalía
-    anomaly_scores = model.decision_function(X)
-    predictions = model.predict(X)
-    # Convertimos la predicción a binaria para consistencia (1 = anomalía, 0 = normal)
+    # Puntajes de normalidad: mayor = más normal
+    scores = model.decision_function(X_full)
+
+    # Selección de umbral para maximizar F1 si hay ground truth
+    best_thr = None
+    best_f1 = None
+    # Construir y_true de forma robusta según columnas disponibles
+    y_true = None
+    if "label" in df_original.columns:
+        y_true = (df_original["label"].astype(str).str.lower() == LABEL_ANOMALY).astype(int).values
+    elif "label_text" in df_original.columns:
+        y_true = (df_original["label_text"].astype(str).str.lower() == LABEL_ANOMALY).astype(int).values
+    elif "training_label" in df_original.columns:
+        y_true = (df_original["training_label"].astype(str).str.lower() == LABEL_ANOMALY).astype(int).values
+    elif "label_num" in df_original.columns:
+        # Si -1 está presente, asúmelo como anomalía; si no, usa 1 como anomalía
+        uniques = set(pd.Series(df_original["label_num"]).dropna().unique().tolist())
+        if -1 in uniques:
+            y_true = (df_original["label_num"] == -1).astype(int).values
+        else:
+            y_true = (df_original["label_num"] == 1).astype(int).values
+
+    if y_true is not None:
+        # Barrido de cuantiles altos (región de anomalías)
+        quantiles = np.linspace(0.80, 0.995, 60)
+        grid = np.quantile(scores, quantiles)
+        # Evitar duplicados en la rejilla
+        grid = np.unique(grid)
+        evals = []
+        for t in grid:
+            y_pred_bin = (scores < t).astype(int)
+            f1 = f1_score(y_true, y_pred_bin, zero_division=0)
+            evals.append((t, f1))
+        best_thr, best_f1 = max(evals, key=lambda x: x[1]) if evals else (np.quantile(scores, DEFAULT_PERCENTILE), None)
+        if best_f1 is not None:
+            print(f"[TM] 🎯 Umbral seleccionado por F1: {best_thr:.6f} (F1={best_f1:.3f})")
+    else:
+        best_thr = np.quantile(scores, DEFAULT_PERCENTILE)
+        print(f"[TM] 📈 Umbral por percentil (sin etiquetas): {best_thr:.6f} (p={DEFAULT_PERCENTILE})")
+
+    # Predicción binaria basada en umbral
+    predictions = np.where(scores < best_thr, ANOMALY_PREDICTION, 1)
+
     result_df = pd.DataFrame()
     # Mantener campos clave
     for col in ["proto", "src_port", "dest_port", "alert_severity", "packet_length",
@@ -104,7 +163,7 @@ try:
         if col in df_original.columns:
             result_df[col] = df_original[col]
     # Añadir resultados del modelo
-    result_df["anomaly_score"] = anomaly_scores
+    result_df["anomaly_score"] = scores
     result_df["prediction"] = predictions
     # Convertimos la predicción a binaria para consistencia (1 = anomalía, 0 = normal)
     result_df["is_anomaly"] = (predictions == ANOMALY_PREDICTION).astype(int)
@@ -112,7 +171,7 @@ try:
     result_df["label"] = result_df["prediction"].apply(lambda x: "anomaly" if x == ANOMALY_PREDICTION else "normal")
     # Contar anomalías detectadas
     total_anomalies = (predictions == ANOMALY_PREDICTION).sum()
-    print(f"[TM] ⚠ Total de anomalías detectadas: {total_anomalies} de {len(X)} eventos.")
+    print(f"[TM] ⚠ Total de anomalías detectadas: {total_anomalies} de {len(X_full)} eventos.")
     # Guardar en CSV
     result_file = "/app/models/suricata_anomaly_analysis.csv"
     result_df.to_csv(result_file, index=False)

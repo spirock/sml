@@ -51,7 +51,7 @@ apt-get update -y
 ### ─────────────────────────────
 msg "Instalando OpenSSH server, Git y utilidades"
 apt-get install -y openssh-server git ca-certificates curl gnupg lsb-release iptables-persistent netfilter-persistent
-
+##sudo apt-get install iptables-persistent netfilter-persistent
 systemctl enable --now ssh
 
 ### ─────────────────────────────
