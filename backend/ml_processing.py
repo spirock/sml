@@ -9,6 +9,8 @@ Funcionalidades principales:
 - Convierte direcciones IP en enteros.
 - Codifica protocolos.
 - Calcula nuevas features como hora del evento, si es de noche, número de puertos únicos y conexiones por IP.
+- Calcula rareza de puerto/IP destino (1/frecuencia).
+- Calcula conexiones en ventana de 5 minutos por IP origen.
 - Normaliza los datos.
 - Prepara el dataset de entrada para el modelo de detección de anomalías.
 
@@ -86,11 +88,19 @@ def preprocess_data(events):
         return df
 
     def add_failed_connections_feature(df):
-        """Calcula el ratio de conexiones con alertas severas"""
-        if 'alert_severity' in df.columns:
-            df['failed_ratio'] = df.groupby('src_ip')['alert_severity'].transform(lambda x: (x > 0).mean())
+        """Calcula el ratio de conexiones con SYN fallidos por src_ip si existen flags TCP; si no, usa severidad"""
+        if {"tcp_flags", "tcp_flags_tc"}.issubset(df.columns) and "src_ip" in df.columns:
+            try:
+                syn_series = (df["tcp_flags_tc"] == "S").astype(int)
+                df["failed_ratio"] = (
+                    syn_series.groupby(df["src_ip"]).rolling(20, min_periods=1).mean().reset_index(level=0, drop=True)
+                )
+            except Exception:
+                df["failed_ratio"] = (df["tcp_flags_tc"] == "S").astype(int).rolling(20, min_periods=1).mean()
+        elif "alert_severity" in df.columns and "src_ip" in df.columns:
+            df["failed_ratio"] = df.groupby("src_ip")["alert_severity"].transform(lambda x: (x > 0).mean())
         else:
-            df['failed_ratio'] = 0
+            df["failed_ratio"] = 0
         return df
 
     def add_temporal_anomaly_feature(df):
@@ -130,6 +140,40 @@ def preprocess_data(events):
             df['pkt_anomaly'] = 0
         return df
 
+    def add_port_ip_rarity_feature(df):
+        """Rareza de puerto y destino: 1/frecuencia normalizada"""
+        # Rareza de puerto destino
+        if "dest_port" in df.columns:
+            port_freq = df["dest_port"].value_counts(normalize=True)
+            df["port_rarity"] = 1.0 / (1e-6 + df["dest_port"].map(port_freq).fillna(0))
+        else:
+            df["port_rarity"] = 0.0
+        # Rareza de IP destino
+        if "dest_ip" in df.columns:
+            ip_freq = df["dest_ip"].value_counts(normalize=True)
+            df["ip_rarity"] = 1.0 / (1e-6 + df["dest_ip"].map(ip_freq).fillna(0))
+        else:
+            df["ip_rarity"] = 0.0
+        return df
+
+    def add_conn_5m_feature(df):
+        """Conteo de conexiones por src_ip en ventana móvil de 5 minutos"""
+        df["conn_5m"] = 0.0
+        if "timestamp" in df.columns and "src_ip" in df.columns:
+            try:
+                df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
+                df.sort_values("timestamp", inplace=True)
+                for src, g in df.groupby("src_ip"):
+                    idx = g.index
+                    ts = g["timestamp"]
+                    ones = pd.Series(1, index=ts)
+                    counts = ones.rolling("5min").sum()
+                    df.loc[idx, "conn_5m"] = counts.values
+            except Exception as e:
+                print(f"[ML] Aviso calculando conn_5m: {e}")
+                df["conn_5m"] = 0.0
+        return df
+
     # Enriquecer con nuevas features
     if "timestamp" in df.columns:
         # Generar event_id usando _id convertido a string
@@ -151,6 +195,8 @@ def preprocess_data(events):
     df = add_temporal_anomaly_feature(df)
     df = add_connection_velocity(df)
     df = add_protocol_behavior(df)
+    df = add_port_ip_rarity_feature(df)
+    df = add_conn_5m_feature(df)
 
     # Añadir columna 'anomaly' basado en training_mode y training_label
     def label_anomaly(row):
@@ -167,6 +213,7 @@ def preprocess_data(events):
     selected_columns = [
         "src_ip", "dest_ip", "proto", "src_port", "dest_port", "alert_severity",
         "packet_length", "hour", "is_night", "ports_used", "conn_per_ip",
+        "port_rarity", "ip_rarity", "conn_5m",
         "port_entropy", "failed_ratio", "hour_anomaly",
         "conn_velocity", "proto_pkt_mean", "proto_pkt_std", "proto_ports", "pkt_anomaly",
         "anomaly", "event_id"

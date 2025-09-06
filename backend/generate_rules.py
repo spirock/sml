@@ -65,7 +65,20 @@ import hashlib
 from bson import ObjectId
 
 # Importar constantes para umbral de anomalía y predicción
+
 from constants import ANOMALY_THRESHOLD, ANOMALY_PREDICTION
+
+# Umbral seleccionado por evaluación (opcional)
+SELECTED_THRESHOLD = None
+try:
+    thr_path = Path("/app/models/selected_threshold.txt")
+    if thr_path.exists():
+        SELECTED_THRESHOLD = float(thr_path.read_text().strip())
+        print(f"[GR] Umbral seleccionado cargado: {SELECTED_THRESHOLD:.6f}")
+    else:
+        print("[GR] No hay selected_threshold.txt; se usará ANOMALY_THRESHOLD estático.")
+except Exception as e:
+    print(f"[GR] No se pudo leer selected_threshold.txt: {e}")
 
 
 # 📌 Configuración de rutas
@@ -197,7 +210,8 @@ def generate_rule(event):
         return None
 
     score = event.get("anomaly_score", 0.0)
-    action = "drop" if score <= ANOMALY_THRESHOLD else "alert"
+    thr = SELECTED_THRESHOLD if SELECTED_THRESHOLD is not None else ANOMALY_THRESHOLD
+    action = "drop" if score <= thr else "alert"
     severity_str = "HIGH risk" if action == "drop" else "suspicious"
 
     # Crear un SID más robusto basado en múltiples atributos
@@ -304,9 +318,27 @@ async def generate_suricata_rules():
         print("[GR] Conteo de predicciones:", df_events["prediction"].value_counts().to_dict())
         anomalies = df_events[df_events["prediction"] == ANOMALY_PREDICTION].copy()
 
-        
+        # 📏 Filtro por umbral seleccionado y heurísticas de severidad/frecuencia
+        thr = SELECTED_THRESHOLD
+        if thr is not None:
+            anomalies = anomalies[anomalies["anomaly_score"] < thr]
+
+        # Requerir severidad >= 2 o repetición por {src_ip, dest_port} >= 3
+        if {"alert_severity", "src_ip", "dest_port"}.issubset(anomalies.columns):
+            try:
+                counts = anomalies.groupby(["src_ip", "dest_port"])['_id'].transform("count")
+                anomalies = anomalies[(anomalies["alert_severity"] >= 2) | (counts >= 3)]
+            except Exception as e:
+                print(f"[GR] Aviso al agrupar para filtros: {e}")
+
+        # Clustering simple para no duplicar reglas: prioriza menor score
+        keys = ["proto", "src_ip", "dest_ip", "dest_port"]
+        existing_cols = [c for c in keys if c in anomalies.columns]
+        if existing_cols:
+            anomalies = anomalies.sort_values("anomaly_score").drop_duplicates(existing_cols, keep="first")
+
         if anomalies.empty:
-            print("[GR] No se detectaron anomalías")
+            print("[GR] No hay anomalías tras aplicar umbral y filtros")
             return
 
         # 6. Cargar reglas existentes
