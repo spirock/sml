@@ -17,7 +17,6 @@ Funcionalidades principales:
 Este preprocesamiento es fundamental para que el modelo de aprendizaje automático pueda aprender patrones
 de tráfico normal y detectar anomalías de manera efectiva.
 """
-from motor.motor_asyncio import AsyncIOMotorClient
 import pandas as pd
 import numpy as np
 import ipaddress  # Asegúrate de importar este módulo al inicio del archivo
@@ -33,28 +32,22 @@ async def fetch_suricata_data(train_only=False):
     collection = db[COLLECTION_NAME]
 
     if train_only:
+        # Este comportamiento se conserva de forma manual para que el usuario pueda elegir interactivamente qué sesión de entrenamiento usar.
+        # No se cambió a automático intencionalmente.
         # Buscar sesiones únicas
         sessions = await collection.distinct("training_session", {"training_mode": True})
         if not sessions:
             print("[ML] ⚠ No se encontraron sesiones de entrenamiento.")
             return []
 
-        print("🔢 Selecciona una sesión de entrenamiento:")
-        for i, sess in enumerate(sessions):
-            print(f"{i + 1}. {sess}")
-
-        try:
-            index = int(input("Escribe el número de la sesión: ")) - 1
-            selected = sessions[index]
-        except (ValueError, IndexError):
-            print("❌ Selección inválida.")
-            return []
+        # Selección no interactiva: tomar la última sesión disponible (más reciente)
+        selected = sessions[-1]
+        print(f"[ML] ✅ Usando la sesión más reciente: {selected}")
 
         query = {
             "training_mode": True,
             "training_session": selected
         }
-        print(f"[ML] ✅ Usando la sesión: {selected}")
     else:
         query = {}
 
@@ -73,6 +66,11 @@ def ip_to_int(ip):
 
 def preprocess_data(events):
     df = pd.DataFrame(events)
+
+    def ensure_column(df, col, default=0):
+        if col not in df.columns:
+            df[col] = default
+        return df
 
     if df.empty:
         print("[ML] ⚠ No se encontraron datos en la base de datos. No se generará suricata_preprocessed.csv.")
@@ -174,21 +172,46 @@ def preprocess_data(events):
                 df["conn_5m"] = 0.0
         return df
 
-    # Enriquecer con nuevas features
-    if "timestamp" in df.columns:
-        # Generar event_id usando _id convertido a string
+    # Enriquecer con nuevas features (robusto a columnas faltantes)
+    if "_id" in df.columns:
         df["event_id"] = df["_id"].astype(str)
+    else:
+        # Si no hay _id, intentamos construir un hash estable
+        if "timestamp" in df.columns:
+            tmp_ts = df["timestamp"].astype(str)
+        else:
+            tmp_ts = df.index.astype(str)
+        s_concat = df.get("src_ip", pd.Series("", index=df.index)).astype(str) + "-" + \
+                   df.get("dest_ip", pd.Series("", index=df.index)).astype(str) + "-" + tmp_ts
+        df["event_id"] = s_concat.apply(lambda s: hashlib.md5(s.encode()).hexdigest())
 
-        # Ahora convertir timestamp
+    if "timestamp" in df.columns:
         df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
-        df["hour"] = df["timestamp"].dt.hour.fillna(0)
-        df["is_night"] = df["hour"].apply(lambda h: 1 if h < 7 or h > 20 else 0)
+        df["hour"] = df["timestamp"].dt.hour.fillna(0).astype(int)
     else:
         df["hour"] = 0
-        df["is_night"] = 0
+    df["is_night"] = df["hour"].apply(lambda h: 1 if h < 7 or h > 20 else 0)
 
-    df["ports_used"] = df.groupby("src_ip")["dest_port"].transform("nunique")
-    df["conn_per_ip"] = df.groupby("src_ip")["dest_ip"].transform("count")
+    # Asegurar columnas base antes de cálculos dependientes
+    for base_col in ["src_ip", "dest_ip", "dest_port", "proto", "packet_length", "alert_severity"]:
+        df = ensure_column(df, base_col, 0)
+
+    # Cálculos que requieren columnas específicas
+    if "src_ip" in df.columns and "dest_port" in df.columns:
+        try:
+            df["ports_used"] = df.groupby("src_ip")["dest_port"].transform("nunique")
+        except Exception:
+            df["ports_used"] = 0
+    else:
+        df["ports_used"] = 0
+
+    if "src_ip" in df.columns and "dest_ip" in df.columns:
+        try:
+            df["conn_per_ip"] = df.groupby("src_ip")["dest_ip"].transform("count")
+        except Exception:
+            df["conn_per_ip"] = 0
+    else:
+        df["conn_per_ip"] = 0
 
     df = add_port_entropy_feature(df)
     df = add_failed_connections_feature(df)
@@ -219,20 +242,35 @@ def preprocess_data(events):
         "anomaly", "event_id"
     ]
 
-    # Verificar si las columnas existen antes de seleccionarlas
-    missing_columns = [col for col in selected_columns if col not in df.columns]
-    if missing_columns:
-        print(f"[ML] ⚠ Falta(n) las siguientes columnas en los datos de MongoDB: {missing_columns}")
-        return None
+    # Asegurar columnas faltantes con valores por defecto antes de seleccionar
+    defaults = {
+        "alert_severity": 0, "packet_length": 0, "hour": 0, "is_night": 0,
+        "ports_used": 0, "conn_per_ip": 0, "port_rarity": 0.0, "ip_rarity": 0.0,
+        "conn_5m": 0.0, "port_entropy": 0.0, "failed_ratio": 0.0, "hour_anomaly": 0,
+        "conn_velocity": 0.0, "proto_pkt_mean": 0.0, "proto_pkt_std": 0.0,
+        "proto_ports": 0.0, "pkt_anomaly": 0, "anomaly": -1
+    }
+    for col, default in defaults.items():
+        df = ensure_column(df, col, default)
+    df = ensure_column(df, "event_id", "")
+    df = ensure_column(df, "proto", 0)
+    df = ensure_column(df, "src_port", 0)
+    df = ensure_column(df, "dest_port", 0)
+    df = ensure_column(df, "src_ip", "0.0.0.0")
+    df = ensure_column(df, "dest_ip", "0.0.0.0")
 
-    df = df[selected_columns].copy()
+    df = df[[c for c in selected_columns if c in df.columns]].copy()
 
     # Convertir direcciones IP a valores numéricos usando ip_to_int()
     df["src_ip"] = df["src_ip"].apply(ip_to_int)
     df["dest_ip"] = df["dest_ip"].apply(ip_to_int)
 
     # Reemplazar valores categóricos del protocolo
-    df["proto"] = df["proto"].astype("category").cat.codes
+    try:
+        df["proto"] = df["proto"].astype("category").cat.codes
+    except Exception:
+        # si ya es numérico o la conversión falla, forzar a numérico
+        df["proto"] = pd.to_numeric(df["proto"], errors="coerce").fillna(0).astype(int)
 
     # Normalizar solo las columnas numéricas
     df = df.drop(columns=["timestamp"], errors="ignore")
