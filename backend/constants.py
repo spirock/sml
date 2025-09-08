@@ -12,6 +12,7 @@ ANOMALY_PREDICTION = -1
 LABEL_NORMAL = "normal"
 LABEL_ANOMALY = "anomaly"
 RULES_FILE = "/var/lib/suricata/rules/sml.rules"
+RULES_DIR  = "/var/lib/suricata/rules"
 
 # Umbrales
 ANOMALY_THRESHOLD = -0.2  # Fallback si no hay umbral calibrado
