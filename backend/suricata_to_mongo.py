@@ -22,6 +22,8 @@ import json
 import asyncio
 import hashlib
 import aiofiles
+import datetime as dt
+from typing import Tuple
 from db_connection import db
 from constants import LABEL_NORMAL, LABEL_ANOMALY
 
@@ -29,8 +31,24 @@ LOG_FILE = "/var/log/suricata/eve.json"
 
 
 def hash_event(event):
-    """Genera un hash único para el evento"""
-    key = f"{event.get('timestamp')}|{event.get('src_ip')}|{event.get('dest_ip')}|{event.get('alert', {}).get('signature')}"
+    """Genera un hash único para el evento usando campos robustos"""
+    parts = [
+        str(event.get('event_type')),
+        str(event.get('timestamp')),
+        str(event.get('src_ip')),
+        str(event.get('dest_ip')),
+        str(event.get('proto')),
+        str(event.get('src_port')),
+        str(event.get('dest_port')),
+        str(event.get('flow_id')),
+        str(event.get('alert', {}).get('signature')),
+        # señales de capa app si existen
+        str(event.get('dns', {}).get('rrname')),
+        str(event.get('tls', {}).get('sni')),
+        str(event.get('http', {}).get('hostname')),
+        str(event.get('http', {}).get('url')),
+    ]
+    key = "|".join(parts)
     return hashlib.sha256(key.encode()).hexdigest()
 
 
@@ -42,7 +60,7 @@ async def insert_event_if_new(collection, event_data):
         event_data["event_hash"] = event_hash
         event_data["processed"] = False
         await collection.insert_one(event_data)
-        print(f"[SM] ✅ Evento insertado: {event_data['alert_signature']}")
+        print(f"[SM] ✅ Evento insertado: {event_data.get('alert_signature','(sin firma)')}")
     else:
         print("[SM] 🔁 Evento duplicado ignorado")
 
@@ -66,6 +84,39 @@ async def monitor_log_file():
         print(f"[SM] ❌ Error leyendo eve.json: {e}")
 
 
+async def read_mode(config_collection) -> Tuple[bool, str, str]:
+    """Lee el modo desde db.config(_id="mode").
+    Compatibilidad:
+      - {"mode": "normal"|"anomaly"|"off"}
+      - {"value": bool, "label": "normal"|"anomaly"}
+    Devuelve: (is_training, training_label, session_hash)
+    Si está en entrenamiento y no hay session_hash, crea uno y lo persiste.
+    """
+    doc = await config_collection.find_one({"_id": "mode"})
+    is_training = False
+    label = "unknown"
+    session_hash = None
+
+    if doc:
+        mode = str(doc.get("mode", "")).lower().strip()
+        if mode in {"normal", "anomaly"}:
+            is_training = True
+            label = mode
+        elif mode == "off":
+            is_training = False
+        else:
+            # compatibilidad con esquema antiguo
+            is_training = bool(doc.get("value", False))
+            label = str(doc.get("label", label)).lower().strip() if is_training else label
+
+        session_hash = doc.get("session_hash") if is_training else None
+        if is_training and not session_hash:
+            session_hash = f"{label}-{dt.datetime.utcnow().strftime('%Y%m%d-%H%M')}"
+            await config_collection.update_one({"_id": "mode"}, {"$set": {"session_hash": session_hash}}, upsert=True)
+
+    return is_training, label, session_hash
+
+
 async def main():
     print("[SM] 🚀 Iniciando monitoreo continuo de Suricata...")
     await db.list_collection_names()  # Confirma la conexión
@@ -73,10 +124,7 @@ async def main():
     config_collection = db["config"]
 
     async for event in monitor_log_file():
-        config = await config_collection.find_one({"_id": "mode"})
-        is_training = config and config.get("value", False)
-        training_label = config.get("label", LABEL_NORMAL) if is_training else "unknown"
-        session_hash = config.get("session_hash") if is_training else None
+        is_training, training_label, session_hash = await read_mode(config_collection)
 
         # Definir comportamiento según modo entrenamiento
         if is_training:
@@ -90,19 +138,33 @@ async def main():
 
         # Preparar datos del evento
         event_data = {
+            # red y transporte
+            "event_type": event.get("event_type"),
+            "timestamp": event.get("timestamp", "Desconocido"),
+            "flow_id": event.get("flow_id"),
+            "proto": str(event.get("proto", "UNKNOWN")).upper(),
             "src_ip": event.get("src_ip", "0.0.0.0"),
-            "dest_ip": event.get("dest_ip", "0.0.0.0"),
-            "proto": event.get("proto", "UNKNOWN"),
             "src_port": event.get("src_port", 0),
+            "dest_ip": event.get("dest_ip", "0.0.0.0"),
             "dest_port": event.get("dest_port", 0),
+            "packet_length": event.get("packet", {}).get("length", 0),
+
+            # alertas y severidad
             "alert_severity": event.get("alert", {}).get("severity", 0),
             "alert_signature": event.get("alert", {}).get("signature", "Sin firma"),
-            "packet_length": event.get("packet", {}).get("length", 0),
-            "timestamp": event.get("timestamp", "Desconocido"),
-            "event_type": event.get("event_type"),
+
+            # capa aplicación (para reglas/ML posteriores)
+            "dns_query": event.get("dns", {}).get("rrname"),
+            "tls_sni": event.get("tls", {}).get("sni"),
+            "http_hostname": event.get("http", {}).get("hostname"),
+            "http_url": event.get("http", {}).get("url"),
+            "file_magic": event.get("fileinfo", {}).get("magic"),
+            "file_mime": event.get("fileinfo", {}).get("mime_type"),
+
+            # modo/entrenamiento
             "training_mode": is_training,
-            "training_label": training_label,
-            "training_session" : session_hash
+            "training_label": training_label if is_training else "unknown",
+            "training_session": session_hash if is_training else None,
         }
 
 

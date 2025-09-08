@@ -1,4 +1,5 @@
 import sys
+import json
 import pandas as pd
 from sklearn.metrics import (
     precision_score,
@@ -17,13 +18,15 @@ import matplotlib.pyplot as plt
 import numpy as np
 from rich.console import Console
 from rich.table import Table
-from constants import ANOMALY_PREDICTION
-
-# Rutas de los archivos
-GROUND_TRUTH_PATH = "/app/models/ground_truth.csv"
-MODEL_OUTPUT_PATH = "/app/models/suricata_anomaly_analysis.csv"
-THRESHOLD_REPORT = "/app/models/threshold_report.csv"
-SELECTED_THRESHOLD_FILE = "/app/models/selected_threshold.txt"
+from constants import (
+    ANOMALY_PREDICTION,
+    GROUND_TRUTH_CSV as GROUND_TRUTH_PATH,
+    SURICATA_ANALYSIS_CSV as MODEL_OUTPUT_PATH,
+    THRESHOLD_REPORT_CSV as THRESHOLD_REPORT,
+    SELECTED_THRESHOLD_FILE,
+    THRESHOLDS_JSON,
+    MIN_PRECISION_FOR_THRESHOLD,
+)
 
 
 def _pick_label_column(gt: pd.DataFrame) -> str:
@@ -98,9 +101,10 @@ def evaluar_modelo():
     unique_labels = set(y_true)
     average_type = 'binary' if len(unique_labels) == 2 and unique_labels <= {0, 1} else 'weighted'
 
-    # Curva Precision-Recall y AP con los scores continuos
-    precision_curve, recall_curve, _ = precision_recall_curve(y_true, y_score)
-    ap_score = average_precision_score(y_true, y_score)
+    # Convertimos el score de "normalidad" a score de anomalía invirtiendo el signo
+    anomaly_score_for_metrics = (-y_score)
+    precision_curve, recall_curve, _ = precision_recall_curve(y_true, anomaly_score_for_metrics)
+    ap_score = average_precision_score(y_true, anomaly_score_for_metrics)
 
     print("\n📋 Reporte de Clasificación (predicción original del modelo):")
     print(classification_report(y_true, y_pred_base, target_names=["Normal", "Anomaly"]))
@@ -108,13 +112,14 @@ def evaluar_modelo():
     precision_base = precision_score(y_true, y_pred_base, average=average_type, zero_division=0)
     recall_base = recall_score(y_true, y_pred_base, average=average_type, zero_division=0)
     f1_base = f1_score(y_true, y_pred_base, average=average_type, zero_division=0)
-    auc_base = roc_auc_score(y_true, y_score)
+    auc_base = roc_auc_score(y_true, anomaly_score_for_metrics)
 
     print("✅ Evaluación base:")
     print(f"  🔹 Precisión:     {precision_base:.2f}")
     print(f"  🔹 Recall:        {recall_base:.2f}")
     print(f"  🔹 F1-Score:      {f1_base:.2f}")
     print(f"  🔹 AUC-ROC:       {auc_base:.2f}")
+    print(f"  🔹 AP (PR-AUC):   {ap_score:.2f}")
 
     cm_base = confusion_matrix(y_true, y_pred_base)
     print("\n📊 Matriz de Confusión (BASE) [TN FP; FN TP]:")
@@ -130,9 +135,8 @@ def evaluar_modelo():
     plt.savefig("/app/models/confusion_matrix_base.png")
     plt.close()
 
-    # ========= 2) SELECCIÓN DE UMBRAL por F1 con los scores =========
-    grid = np.quantile(y_score, np.linspace(0.80, 0.995, 60))
-    grid = np.unique(grid)
+    # ========= 2) SELECCIÓN DE UMBRAL por F1 con restricción de precisión =========
+    grid = np.unique(np.quantile(y_score, np.linspace(0.80, 0.999, 120)))
     if grid.size == 0:
         print("⚠ Rejilla vacía para scores. Revisa 'anomaly_score'.")
         sys.exit(1)
@@ -140,19 +144,34 @@ def evaluar_modelo():
     evals = []
     for t in grid:
         y_pred_thr = (y_score < t).astype(int)
-        evals.append((
-            t,
-            precision_score(y_true, y_pred_thr, zero_division=0),
-            recall_score(y_true, y_pred_thr, zero_division=0),
-            f1_score(y_true, y_pred_thr, zero_division=0),
-        ))
+        p = precision_score(y_true, y_pred_thr, zero_division=0)
+        r = recall_score(y_true, y_pred_thr, zero_division=0)
+        f1v = f1_score(y_true, y_pred_thr, zero_division=0)
+        if p >= MIN_PRECISION_FOR_THRESHOLD:
+            evals.append((t, p, r, f1v))
 
-    thr, p, r, f1v = max(evals, key=lambda x: x[3])
+    if evals:
+        thr, p, r, f1v = max(evals, key=lambda x: x[3])
+    else:
+        # Fallback conservador: percentil 98
+        thr = float(np.quantile(y_score, 0.98))
+        p = r = f1v = 0.0
 
     # Persistir artefactos del umbral
     pd.DataFrame({"threshold": [thr], "precision": [p], "recall": [r], "f1": [f1v]}).to_csv(THRESHOLD_REPORT, index=False)
     with open(SELECTED_THRESHOLD_FILE, "w") as f:
         f.write(str(thr))
+
+    # Persistimos también un JSON con parámetros relevantes
+    try:
+        with open(THRESHOLDS_JSON, 'w') as jf:
+            json.dump({
+                "thr_if": float(thr),
+                "min_precision": float(MIN_PRECISION_FOR_THRESHOLD),
+                "grid": {"start": 0.80, "end": 0.999, "steps": 120}
+            }, jf)
+    except Exception as e:
+        print(f"⚠ No se pudo escribir {THRESHOLDS_JSON}: {e}")
 
     cm_thr = confusion_matrix(y_true, (y_score < thr).astype(int))
 

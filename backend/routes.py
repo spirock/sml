@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 from typing import Optional
 import os
 import json
@@ -8,20 +8,17 @@ import numpy as np
 from db_connection import db
 from datetime import datetime
 import socket
-from fastapi import APIRouter, BackgroundTasks, HTTPException 
 from hashlib import sha256
 import time
 
 from generate_rules import generate_suricata_rules  # 👈 Asegúrate que el nombre y la ruta sean correctos
+from constants import IFOREST_MODEL, RULES_FILE, RULES_DIR
 
 
 
 router = APIRouter()
 
 LOG_FILE = "/var/log/suricata/eve.json"
-# 📌 Rutas importantes
-RULES_FILE = "/var/lib/suricata/rules/sml.rules"
-RULES_DIR = "/var/lib/suricata/rules"
 
 @router.post("/generate-rules")
 async def generate_rules_endpoint(background_tasks: BackgroundTasks):
@@ -93,7 +90,7 @@ async def get_logs(page: int = 1, limit: int = 100, dia: int = None, mes: int = 
     except Exception as e:
         return {"error": str(e)}
     
-MODEL_PATH = "/app/models/isolation_forest_model.pkl"
+MODEL_PATH = IFOREST_MODEL
 
 # Cargar el modelo entrenado
 model = joblib.load(MODEL_PATH)
@@ -234,22 +231,53 @@ async def get_model_stats():
     }
 
 
+# ===== MODO (unificado) =====
+async def _read_mode():
+    cfg = await db["config"].find_one({"_id": "mode"}) or {}
+    # Nuevo esquema
+    mode = str(cfg.get("mode", "")).strip().lower()
+    if mode in {"normal", "anomaly", "off"}:
+        return {"mode": mode, "session_hash": cfg.get("session_hash")}
+    # Compatibilidad con esquema anterior
+    if bool(cfg.get("value", False)):
+        if str(cfg.get("label", "")).lower() in {"normal", "anomaly"}:
+            return {"mode": str(cfg.get("label")).lower(), "session_hash": cfg.get("session_hash")}
+    return {"mode": "off", "session_hash": cfg.get("session_hash")}
+
+async def _write_mode(mode: str, new_hash: bool = False):
+    mode = str(mode).strip().lower()
+    if mode not in {"normal", "anomaly", "off"}:
+        raise HTTPException(status_code=400, detail="Modo inválido. Usa normal|anomaly|off")
+    cfg = await db["config"].find_one({"_id": "mode"}) or {}
+    session_hash = cfg.get("session_hash")
+    if mode in {"normal", "anomaly"} and (new_hash or not session_hash):
+        session_hash = sha256(f"{mode}-{time.time()}".encode()).hexdigest()[:16]
+    update = {"mode": mode}
+    if session_hash:
+        update["session_hash"] = session_hash
+    # Compatibilidad con esquema anterior
+    if mode == "off":
+        update.update({"value": False, "label": "undefined"})
+    else:
+        update.update({"value": True, "label": mode})
+    await db["config"].update_one({"_id": "mode"}, {"$set": update}, upsert=True)
+    return {"mode": mode, "session_hash": session_hash}
+
+@router.get("/mode")
+async def get_mode():
+    return await _read_mode()
+
+@router.post("/mode")
+async def set_mode(payload: dict):
+    mode = payload.get("mode")
+    new_hash = bool(payload.get("new_hash", False))
+    res = await _write_mode(mode, new_hash=new_hash)
+    return {"ok": True, **res}
+
 @router.get("/training-mode")
 async def get_training_mode():
-    config_collection = db["config"]
-    config = await config_collection.find_one({"_id": "mode"})
-    if config:
-        return {
-            "value": config.get("value", False),
-            "label": config.get("label", "undefined"),
-            "session_hash": config.get("session_hash", "undefined")
-        }
-    else:
-        return {
-            "value": False,
-            "label": "undefined",
-            "session_hash": "undefined"
-        }
+    m = await _read_mode()
+    return {"value": m["mode"] in {"normal", "anomaly"}, "label": m["mode"] if m["mode"] != "off" else "undefined", "session_hash": m.get("session_hash") or "undefined"}
 
 
 @router.post("/training-mode/on")
@@ -259,56 +287,11 @@ async def activate_training_mode(
 ):
     if label not in ["normal", "anomaly"]:
         raise HTTPException(status_code=400, detail="Etiqueta inválida. Usa 'normal' o 'anomaly'")
-
-    config_collection = db["config"]
-    config = await config_collection.find_one({"_id": "mode"}) or {}
-
-    current_hash = config.get("session_hash")
-
-    if current_hash and not new_hash:
-        # Actualizar la etiqueta si ha cambiado
-        if config.get("label") != label:
-            await config_collection.update_one(
-                {"_id": "mode"},
-                {"$set": {"label": label,"value": True}}
-            )
-
-        return {
-            "message": "Modo entrenamiento ya activado con hash existente.",
-            "session_hash": current_hash,
-            "label": label,
-            "nota": "Si deseas generar un nuevo hash, añade '?new_hash=true' en la URL."
-        }
-
-    # Generar nuevo hash
-    hash_input = f"{label}-{time.time()}".encode()
-    session_hash = sha256(hash_input).hexdigest()[:16]
-
-    await config_collection.update_one(
-        {"_id": "mode"},
-        {
-            "$set": {
-                "value": True,
-                "label": label,
-                "session_hash": session_hash
-            }
-        },
-        upsert=True
-    )
-
-    return {
-        "message": f"Modo entrenamiento activado como '{label}' con nuevo hash.",
-        "session_hash": session_hash
-    }
-
+    res = await _write_mode(label, new_hash=new_hash)
+    return {"message": f"Modo entrenamiento activado como '{label}'.", **res}
 
 
 @router.post("/training-mode/off")
-def deactivate_training_mode():
-    config_collection = db["config"]
-    config_collection.update_one(
-        {"_id": "mode"},
-        {"$set": {"value": False, "label": "undefined"}},
-        upsert=True
-    )
-    return {"message": "Modo entrenamiento desactivado."}
+async def deactivate_training_mode():
+    res = await _write_mode("off")
+    return {"message": "Modo entrenamiento desactivado.", **res}

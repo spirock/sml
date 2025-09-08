@@ -1,20 +1,3 @@
-# --- Funciones auxiliares para reglas contextuales ---
-def gen_sid(event):
-    """Genera un SID único basado en IP y puertos"""
-    unique_str = f"{event['src_ip']}-{event['dest_port']}-{event['proto']}"
-    return 3000000 + int(hashlib.sha256(unique_str.encode()).hexdigest(), 16) % 900000
-
-def generate_contextual_rule(event, historical_data):
-    """Genera reglas basadas en comportamiento histórico"""
-    ip_behavior = historical_data[historical_data['src_ip'] == event['src_ip']]
-    
-    if len(ip_behavior) > 10:
-        port_range = f"{ip_behavior['dest_port'].min()}:{ip_behavior['dest_port'].max()}"
-        return (
-            f"alert {event['proto']} {event['src_ip']} any -> any {port_range} "
-            f'(msg:"Suspicious port range access from {event["src_ip"]}"; sid:{gen_sid(event)};)'
-        )
-    return None
 """
 generate_rules.py
 
@@ -63,49 +46,82 @@ import subprocess
 from pathlib import Path
 import hashlib
 from bson import ObjectId
+import json
+from constants import (
+    ANOMALY_THRESHOLD,
+    ANOMALY_PREDICTION,
+    IFOREST_MODEL,
+    THRESHOLDS_JSON,
+    SELECTED_THRESHOLD_FILE,
+    ALERT_ONLY_PORTS,
+    LOCAL_SERVICES,
+    MIN_SEVERITY_TO_DROP,
+    MIN_FREQ_TO_DROP,
+    RULES_FILE,
+)
 
-# Importar constantes para umbral de anomalía y predicción
 
-from constants import ANOMALY_THRESHOLD, ANOMALY_PREDICTION
+# --- Funciones auxiliares para reglas contextuales ---
+def gen_sid(event):
+    """Genera un SID único basado en IP y puertos"""
+    unique_str = f"{event['src_ip']}-{event['dest_port']}-{event['proto']}"
+    return 3000000 + int(hashlib.sha256(unique_str.encode()).hexdigest(), 16) % 900000
+
+def generate_contextual_rule(event, historical_data):
+    """Genera reglas basadas en comportamiento histórico"""
+    ip_behavior = historical_data[historical_data['src_ip'] == event['src_ip']]
+    
+    if len(ip_behavior) > 10:
+        port_range = f"{ip_behavior['dest_port'].min()}:{ip_behavior['dest_port'].max()}"
+        return (
+            f"alert {event['proto']} {event['src_ip']} any -> any {port_range} "
+            f'(msg:"Suspicious port range access from {event["src_ip"]}"; sid:{gen_sid(event)};)'
+        )
+    return None
+
 
 # Umbral seleccionado por evaluación (opcional)
 SELECTED_THRESHOLD = None
 try:
-    thr_path = Path("/app/models/selected_threshold.txt")
-    if thr_path.exists():
-        SELECTED_THRESHOLD = float(thr_path.read_text().strip())
-        print(f"[GR] Umbral seleccionado cargado: {SELECTED_THRESHOLD:.6f}")
+    # Prioridad 1: thresholds.json
+    p = Path(THRESHOLDS_JSON)
+    if p.exists():
+        data = json.loads(p.read_text())
+        SELECTED_THRESHOLD = float(data.get("thr_if"))
+        print(f"[GR] thr_if desde thresholds.json: {SELECTED_THRESHOLD:.6f}")
     else:
-        print("[GR] No hay selected_threshold.txt; se usará ANOMALY_THRESHOLD estático.")
+        # Prioridad 2: selected_threshold.txt
+        thr_path = Path(SELECTED_THRESHOLD_FILE)
+        if thr_path.exists():
+            SELECTED_THRESHOLD = float(thr_path.read_text().strip())
+            print(f"[GR] Umbral seleccionado cargado: {SELECTED_THRESHOLD:.6f}")
+        else:
+            print("[GR] No hay thresholds.json ni selected_threshold.txt; se usará ANOMALY_THRESHOLD.")
 except Exception as e:
-    print(f"[GR] No se pudo leer selected_threshold.txt: {e}")
+    print(f"[GR] No se pudo leer thresholds: {e}")
 
 
 # 📌 Configuración de rutas
-RULES_FILE = "/var/lib/suricata/rules/sml.rules"
-DATA_PATH = "/app/models/suricata_preprocessed.csv"
-MODEL_PATH = "/app/models/isolation_forest_model.pkl"
+# Ruta de reglas según tu despliegue real
+
+HISTORICAL_CSV = "/app/models/suricata_preprocessed.csv"  # opcional
+MODEL_PATH = IFOREST_MODEL
 SOCKET_PATH = "/var/run/suricata/suricata-command.socket"
 
 # 📦 Cargar modelo y datos
 def load_resources():
-    """Carga el modelo y los datos necesarios"""
-    if not all(os.path.exists(path) for path in [MODEL_PATH, DATA_PATH]):
-        raise FileNotFoundError("No se encontraron los archivos del modelo o datos preprocesados")
-    
+    """Carga el modelo y (opcional) datos históricos"""
+    if not os.path.exists(MODEL_PATH):
+        raise FileNotFoundError(f"No existe el modelo en {MODEL_PATH}")
     model = joblib.load(MODEL_PATH)
     print("✔ Modelo cargado correctamente")
 
-    df_processed = pd.read_csv(DATA_PATH)
-
-    # 🔄 Renombrar columnas si vienen con puntos del CSV
-
-    #print("[GR] 📋 Modelo espera:", list(model.feature_names_in_))
-    print("[GR] Columnas disponibles:", df_processed.columns.tolist())
-    if df_processed.empty:
-        raise ValueError("No hay datos para predecir reglas de Suricata")
-    
-    return model, df_processed
+    hist_df = pd.read_csv(HISTORICAL_CSV) if os.path.exists(HISTORICAL_CSV) else pd.DataFrame()
+    if hist_df.empty:
+        print("[GR] Sin histórico CSV; las reglas contextuales usarán sólo conteos en memoria.")
+    else:
+        print("[GR] Columnas histórico:", hist_df.columns.tolist())
+    return model, hist_df
 
 
 def safe_ip_to_int(ip):
@@ -117,30 +133,36 @@ def safe_ip_to_int(ip):
 async def is_training_mode():
     try:
         config = await db["config"].find_one({"_id": "mode"})
-        return bool(config and config.get("training_mode", False))
+        if not config:
+            return False
+        # Compatibilidad: nuevo esquema {mode: normal|anomaly|off}
+        mode = str(config.get("mode", "")).strip().lower()
+        if mode in {"normal", "anomaly"}:
+            return True
+        if mode == "off":
+            return False
+        # Esquema anterior: {training_mode: bool}
+        return bool(config.get("training_mode", False) or config.get("value", False))
     except Exception as e:
         print(f"[GR] ⚠ Error al verificar modo entrenamiento: {e}")
         return False
 
 def preprocess_data(df, expected_columns):
     """Preprocesa los datos para el modelo"""
-
-    # Renombrar campos a lo que espera el modelo
-
-
-    # Convertir IPs a enteros
+    # Convertir IPs a enteros si existen como texto
     for ip_col in ["src_ip", "dest_ip"]:
         if ip_col in df.columns:
             df[ip_col] = df[ip_col].astype(str).apply(safe_ip_to_int)
 
-    # Convertir columnas esperadas a numérico
+    # Asegurar todas las columnas esperadas como numéricas
+    out = {}
     for col in expected_columns:
         if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors="coerce")
+            out[col] = pd.to_numeric(df[col], errors="coerce")
         else:
-            df[col] = pd.to_numeric(df.get(col, 0), errors="coerce")
-
-    return df.fillna(0)[expected_columns]
+            out[col] = pd.Series(0, index=df.index, dtype="float64")
+    X = pd.DataFrame(out)
+    return X.fillna(0)[expected_columns]
 
 # 📥 Obtener eventos desde MongoDB
 async def fetch_latest_events(limit=100):
@@ -184,45 +206,40 @@ def load_existing_rules():
 
 # ✨ Generación de reglas
 def generate_rule(event):
-    """Genera una regla Suricata individual más robusta y detallada."""
+    """Genera una regla Suricata individual con políticas anti-FP."""
     try:
-        # Dirección IP de origen convertida en formato estándar (string)
-        src_ip = str(ipaddress.ip_address(event["src_ip"]))
-
-        # Dirección IP de destino convertida en formato estándar (string)
-        dest_ip = str(ipaddress.ip_address(event["dest_ip"]))
-
-        # Protocolo de red (e.g., tcp, udp, icmp); se usa "ip" como valor por defecto
-        proto = str(event.get("proto", "ip")).lower()
-
-        # Puerto de origen (entero), o 0 si no está presente
-        src_port = int(event.get("src_port", 0))
-
-        # Puerto de destino (entero), o 0 si no está presente
-        dest_port = int(event.get("dest_port", 0))
-
-        # Nivel de severidad de la alerta (entero), por defecto 1 si no se especifica
-        severity = int(event.get("alert_severity", 1))
-
-        # Longitud del paquete capturado (entero), por defecto 0 si no se especifica
-        pkt_len = int(event.get("packet_length", 0))
-    except (ValueError, ipaddress.AddressValueError):
+        proto = str(event.get("proto", "")).lower()
+        if proto not in {"tcp", "udp"}:
+            return None
+        src_ip = str(ipaddress.ip_address(event.get("src_ip")))
+        dst_ip = str(ipaddress.ip_address(event.get("dest_ip")))
+        src_port = int(event.get("src_port", 0)) if event.get("src_port") else "any"
+        dst_port = int(event.get("dest_port", 0))
+        if dst_port <= 0:
+            return None
+    except Exception:
         return None
 
-    score = event.get("anomaly_score", 0.0)
+    # No reglas DROP hacia servicios locales conocidos
+    if str(event.get("dest_ip")) in LOCAL_SERVICES:
+        return None
+
+    sev = int(pd.to_numeric(event.get("alert_severity", 0)))
+    pkt_len = int(pd.to_numeric(event.get("packet_length", 0)))
+    score = float(pd.to_numeric(event.get("anomaly_score", 0.0)))
     thr = SELECTED_THRESHOLD if SELECTED_THRESHOLD is not None else ANOMALY_THRESHOLD
-    action = "drop" if score <= thr else "alert"
+
+    # Política de acción
+    alert_only = dst_port in ALERT_ONLY_PORTS
+    should_drop = bool(event.get("should_drop", False)) and not alert_only
+    action = "drop" if should_drop and (score < thr) else "alert"
+
     severity_str = "HIGH risk" if action == "drop" else "suspicious"
+    unique_id = f"{src_ip}-{dst_ip}-{proto}-{dst_port}-{sev}-{pkt_len}-{round(score, 3)}"
+    sid = 3000000 + (int(hashlib.sha256(unique_id.encode()).hexdigest(), 16) % 500000)
 
-    # Crear un SID más robusto basado en múltiples atributos
-    unique_id = f"{src_ip}-{dest_ip}-{proto}-{dest_port}-{severity}-{pkt_len}-{round(score, 2)}"
-    sid = 1000000 + (int(hashlib.sha256(unique_id.encode()).hexdigest(), 16) % 900000)
-
-    return (
-        f"{action} {proto} {src_ip} {src_port} -> {dest_ip} {dest_port} "
-        f'(msg:"{severity_str} traffic (score: {score:.2f}, len: {pkt_len}, severity: {severity})"; '
-        f"sid:{sid}; rev:1;)"
-    )
+    msg = f'"ML anomaly (score: {score:.2f}, len: {pkt_len}, severity: {sev}, thr: {thr:.2f})"'
+    return f"{action} {proto} {src_ip} {src_port} -> {dst_ip} {dst_port} (msg:{msg}; sid:{sid}; rev:1;)"
 
 
 # 🔄 Recarga de reglas en Suricata
@@ -265,30 +282,24 @@ async def mark_events_as_processed(event_ids):
 # 🚀 Función principal actualizada y corregida
 async def generate_suricata_rules():
     try:
-        # 1. Cargar modelo (ya no se usa df_processed aquí)
-        model, _ = load_resources()
-
-        # 2. Obtener eventos recientes
+        # 1. Obtener eventos recientes
         events = await fetch_latest_events()
         if await is_training_mode():
             print("[GR] 🧠 Modo entrenamiento activo: no se generarán reglas para estos eventos.")
             await mark_events_as_processed([event["_id"] for event in events if "_id" in event])
             return
+        # 2. Cargar modelo
+        model, historical_data = load_resources()
         if not events:
             print("[GR] No hay eventos recientes para analizar")
             return
 
         df_events = pd.DataFrame(events)
-        historical_data = pd.read_csv(DATA_PATH)
-        # Renombrar campos a lo que espera el modelo
-
         event_ids = [event["_id"] for event in events if "_id" in event]
 
         # 3. Preprocesar eventos para el modelo
-        #df_numeric = preprocess_data(df_events.copy())
         expected_columns = list(model.feature_names_in_)
         df_numeric = preprocess_data(df_events.copy(), expected_columns)
-
 
         # ✅ Seleccionar solo las columnas que el modelo espera
         expected_columns = model.feature_names_in_ if hasattr(model, "feature_names_in_") else list(df_numeric.columns[:model.n_features_in_])
@@ -302,9 +313,7 @@ async def generate_suricata_rules():
             print(f"[GR] ❌ Faltan columnas esperadas: {missing}")
             return
 
-
         df_numeric = df_numeric[expected_cols]
-
 
         # 4. Verificar dimensiones del modelo
         if df_numeric.shape[1] != model.n_features_in_:
@@ -318,18 +327,26 @@ async def generate_suricata_rules():
         print("[GR] Conteo de predicciones:", df_events["prediction"].value_counts().to_dict())
         anomalies = df_events[df_events["prediction"] == ANOMALY_PREDICTION].copy()
 
-        # 📏 Filtro por umbral seleccionado y heurísticas de severidad/frecuencia
-        thr = SELECTED_THRESHOLD
-        if thr is not None:
-            anomalies = anomalies[anomalies["anomaly_score"] < thr]
+        # 📏 Filtro por umbral y políticas anti-FP
+        thr = SELECTED_THRESHOLD if SELECTED_THRESHOLD is not None else ANOMALY_THRESHOLD
+        anomalies = anomalies.copy()
 
-        # Requerir severidad >= 2 o repetición por {src_ip, dest_port} >= 3
-        if {"alert_severity", "src_ip", "dest_port"}.issubset(anomalies.columns):
-            try:
-                counts = anomalies.groupby(["src_ip", "dest_port"])['_id'].transform("count")
-                anomalies = anomalies[(anomalies["alert_severity"] >= 2) | (counts >= 3)]
-            except Exception as e:
-                print(f"[GR] Aviso al agrupar para filtros: {e}")
+        # Tipados y exclusiones
+        anomalies["dest_port"] = pd.to_numeric(anomalies.get("dest_port", 0), errors="coerce").fillna(0).astype(int)
+        anomalies = anomalies[~anomalies["dest_ip"].astype(str).isin(LOCAL_SERVICES)]
+
+        # Umbral externo del IF
+        anomalies = anomalies[anomalies["anomaly_score"] < thr]
+
+        # Frecuencia por {src_ip, dest_port}
+        if {"src_ip", "dest_port", "_id"}.issubset(anomalies.columns):
+            anomalies["freq_sp"] = anomalies.groupby(["src_ip", "dest_port"])['_id'].transform("count").fillna(0).astype(int)
+        else:
+            anomalies["freq_sp"] = 0
+
+        # Señales mínimas para permitir DROP
+        sev = pd.to_numeric(anomalies.get("alert_severity", 0), errors="coerce").fillna(0).astype(int)
+        anomalies["should_drop"] = (sev >= MIN_SEVERITY_TO_DROP) & (anomalies["freq_sp"] >= MIN_FREQ_TO_DROP) & (~anomalies["dest_port"].isin(ALERT_ONLY_PORTS))
 
         # Clustering simple para no duplicar reglas: prioriza menor score
         keys = ["proto", "src_ip", "dest_ip", "dest_port"]
@@ -356,7 +373,7 @@ async def generate_suricata_rules():
             if len(ports) > 10:  # Umbral de escaneo de puertos
                 try:
                     ip_str = str(ipaddress.ip_address(ip))
-                    rule_base = f"drop ip {ip_str} any -> any any"
+                    rule_base = f"alert ip {ip_str} any -> any any"
                     if rule_base not in rule_patterns:
                         sid = 2000000 + int(hashlib.sha256(ip_str.encode()).hexdigest(), 16) % 900000
                         rule = f'{rule_base} (msg:"Detected port scanning activity from {ip_str}"; sid:{sid}; rev:1;)'
@@ -367,11 +384,12 @@ async def generate_suricata_rules():
                     print(f"[GR] ⚠ Error generando regla para IP {ip}: {e}")
 
         # 6b. Generar reglas contextuales por comportamiento histórico
-        for _, event in anomalies.iterrows():
-            contextual_rule = generate_contextual_rule(event, historical_data)
-            if contextual_rule and contextual_rule not in existing_rules:
-                print(f"[GR] ➕ Regla contextual generada:\n{contextual_rule}")
-                new_rules.append(contextual_rule)
+        if not historical_data.empty:
+            for _, event in anomalies.iterrows():
+                contextual_rule = generate_contextual_rule(event, historical_data)
+                if contextual_rule and contextual_rule not in existing_rules:
+                    print(f"[GR] ➕ Regla contextual generada:\n{contextual_rule}")
+                    new_rules.append(contextual_rule)
 
         # 7. Generar nuevas reglas evitando duplicados y reglas redundantes (mismo src_ip, dest_ip, dest_port)
         seen_combinations = set()
@@ -399,7 +417,6 @@ async def generate_suricata_rules():
 
             print(f"[GR] ✅✅✅ {len(new_rules)} nuevas reglas añadidas (Total: {len(manual_rules) + len(new_rules)})")
 
-            
             # 9. Recargar reglas en Suricata
             if not await reload_suricata_rules():
                 print("[GR] ⚠ Las reglas se guardaron pero no se recargaron en Suricata")
