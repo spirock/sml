@@ -3,7 +3,7 @@ uvicorn
 motor  # Cliente asíncrono para MongoDB
 pydantic
 watchdog  # Para monitoreo de logs en tiempo real
-scikit-learn
+scikit-learn==1.6.1
 pandas
 numpy
 joblib 

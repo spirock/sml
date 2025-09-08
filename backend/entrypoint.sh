@@ -19,6 +19,7 @@ echo "📂 Verificando la base de datos en MongoDB..."
 python -c 'import asyncio; from db_connection import init_db; asyncio.run(init_db())'
 echo "✅ Base de datos y colección verificadas."
 
+
 # === Asegurar artefactos mínimos para primer arranque (placeholders) ===
 MODEL_DIR="/app/models"
 mkdir -p "$MODEL_DIR"
