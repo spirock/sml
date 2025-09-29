@@ -174,7 +174,8 @@ def preprocess_data(events):
 
     # Enriquecer con nuevas features (robusto a columnas faltantes)
     if "_id" in df.columns:
-        df["event_id"] = df["_id"].astype(str)
+        df["_id"] = df["_id"].astype(str)
+        df["event_id"] = df["_id"]
     else:
         # Si no hay _id, intentamos construir un hash estable
         if "timestamp" in df.columns:
