@@ -6,6 +6,12 @@ import ipaddress
 from concurrent.futures import ThreadPoolExecutor
 from typing import Optional, List, Set
 
+# Normaliza PATH para detectar binarios en sbin cuando se ejecuta como usuario
+for _p in ("/usr/local/sbin", "/usr/sbin", "/sbin"):
+    cur = os.environ.get("PATH", "")
+    if _p not in cur:
+        os.environ["PATH"] = (cur + (":" if cur else "") + _p)
+
 # ---------- utilidades ----------
 
 AptPkgs = [
@@ -68,13 +74,20 @@ def have_sudo() -> bool:
 
 
 def which(cmd: str) -> Optional[str]:
-    """Devuelve ruta del ejecutable si existe, considerando ~/.local/bin."""
-    path = shutil.which(cmd)
-    if path:
-        return path
-    home_bin = os.path.expanduser("~/.local/bin")
-    cand = os.path.join(home_bin, cmd)
-    return cand if os.path.exists(cand) and os.access(cand, os.X_OK) else None
+    """Busca binarios también en sbin/bin estándar y ~/.local/bin."""
+    p = shutil.which(cmd)
+    if p:
+        return p
+    search_dirs = (
+        "/usr/local/sbin", "/usr/sbin", "/sbin",
+        "/usr/local/bin", "/usr/bin", "/bin",
+        os.path.expanduser("~/.local/bin"),
+    )
+    for d in search_dirs:
+        cand = os.path.join(d, cmd)
+        if os.path.exists(cand) and os.access(cand, os.X_OK):
+            return cand
+    return None
 
 
 def have(cmd: str) -> bool:
@@ -263,17 +276,17 @@ def simulate_attacks(target_ip: str, ddos_seconds: int, dry: bool):
         skip("nikto", "Escaneo de vulnerabilidades web (Nikto)")
 
     if have("sqlmap"):
-        attacks.append((f'sqlmap -u "http://{target_ip}/search.php?q=test" --batch --random-agent', "SQLi sqlmap"))
+        attacks.append(("sqlmap -u \"http://{}/search.php?q=test\" --batch --random-agent".format(target_ip), "SQLi sqlmap"))
     else:
         skip("sqlmap", "Inyección SQL (sqlmap)")
 
     if have("xsstrike"):
-        attacks.append((f'xsstrike -u "http://{target_ip}/search?q=test" --crawl', "XSS XSStrike"))
+        attacks.append(("xsstrike -u \"http://{}/search?q=test\" --crawl".format(target_ip), "XSS XSStrike"))
     else:
         skip("xsstrike", "Ataque XSS (XSStrike)")
 
     if have("commix"):
-        attacks.append((f'commix --url="http://{target_ip}/ping.php?addr=127.0.0.1" --batch', "OS command inject Commix"))
+        attacks.append(("commix --url=\"http://{}/ping.php?addr=127.0.0.1\" --batch".format(target_ip), "OS command inject Commix"))
     else:
         skip("commix", "Inyección de comandos (Commix)")
 
@@ -290,8 +303,8 @@ def simulate_attacks(target_ip: str, ddos_seconds: int, dry: bool):
 
     # C2 / Beaconing / Evasión
     attacks += [
-        (f"curl -A {shlex.quote(ua)} -H 'X-Forwarded-For: {random_ip()}' http://{target_ip}/c2.php?data=test", "Curl C2 headers falsos"),
-        (f"for i in {{1..10}}; do curl -s http://{target_ip}/beacon_$(date +%s) >/dev/null; sleep 0.5; done", "Beaconing HTTP"),
+        ("curl -A {} -H 'X-Forwarded-For: {}' http://{}/c2.php?data=test".format(shlex.quote(ua), random_ip(), target_ip), "Curl C2 headers falsos"),
+        ("for i in $(seq 1 10); do curl -s http://{}/beacon_$(date +%s) >/dev/null; sleep 0.5; done".format(target_ip), "Beaconing HTTP"),
     ]
 
     if have("hping3"):

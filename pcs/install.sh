@@ -1,4 +1,3 @@
-cat > install_lab_tools.sh <<'SH'
 #!/usr/bin/env bash
 # Instalación de herramientas de ofensiva SOLO para LAB.
 # Funciona en Debian/Ubuntu mínimos. Reintenta vía Git si APT falla.
@@ -153,15 +152,21 @@ fi
 # 12) metasploit (opcional, script oficial)
 if command -v msfconsole >/dev/null; then say "metasploit ya instalado"; else
   warn "Instalando Metasploit (opcional). Esto tarda y añade repos de Rapid7."
-  curl -fsSL https://raw.githubusercontent.com/rapid7/metasploit-framework/master/msfinstall | $SUDO sh || warn "msfinstall falló"
+  # Script oficial de Rapid7 (metasploit-omnibus)
+  # Referencia: https://docs.rapid7.com/metasploit/installing-the-metasploit-framework/
+  if curl -fsSL -L https://raw.githubusercontent.com/rapid7/metasploit-omnibus/master/config/templates/metasploit-framework-wrappers/msfupdate.erb -o /tmp/msfinstall; then
+    chmod 755 /tmp/msfinstall && $SUDO /tmp/msfinstall || warn "msfinstall: ejecución falló"
+  else
+    warn "Descarga de msfinstall falló. Probando vía Snap (opcional)."
+    if command -v snap >/dev/null 2>&1; then
+      $SUDO snap install metasploit-framework || warn "Snap metasploit-framework falló"
+    else
+      warn "snapd no está instalado. Para intentar Snap: sudo apt-get install -y snapd && sudo snap install metasploit-framework"
+    fi
+  fi
 fi
 
 say "Verificación final:"
 for b in nmap hping3 slowhttptest nikto sqlmap xsstrike commix hydra medusa dnsrecon goldeneye msfconsole; do
   command -v "$b" >/dev/null && echo " - $b: OK" || echo " - $b: NO"
 done
-SH
-chmod +x install_lab_tools.sh
-
-# Ejecutar
-sudo ./install_lab_tools.sh

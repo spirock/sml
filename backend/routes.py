@@ -90,15 +90,27 @@ async def get_logs(page: int = 1, limit: int = 100, dia: int = None, mes: int = 
     except Exception as e:
         return {"error": str(e)}
     
-MODEL_PATH = IFOREST_MODEL
 
-# Cargar el modelo entrenado
-model = joblib.load(MODEL_PATH)
+# Cargar el modelo entrenado de forma segura (no fallar si no existe)
+MODEL_PATH = IFOREST_MODEL
+model = None
+if os.path.exists(MODEL_PATH):
+    try:
+        model = joblib.load(MODEL_PATH)
+        print("[ROUTER] ✅ Modelo cargado correctamente desde", MODEL_PATH)
+    except Exception as e:
+        # No queremos que un error al deserializar el modelo haga caer toda la API
+        print(f"[ROUTER] ⚠ Error cargando el modelo {MODEL_PATH}: {e}")
+else:
+    print(f"[ROUTER] ⚠ Modelo no encontrado en {MODEL_PATH}; la API de predicción quedará en modo degradado.")
 
 
 @router.post("/predict")
 async def predict_anomaly(data: dict):
     try:
+        # Si el modelo no está cargado, devolver un error 503 claro
+        if model is None:
+            raise HTTPException(status_code=503, detail="Modelo no cargado. Ejecuta el entrenamiento o carga el modelo antes de usar /predict.")
         # Convertir datos de entrada en DataFrame
         df = pd.DataFrame([data])
 
