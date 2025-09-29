@@ -128,10 +128,11 @@ async def main():
 
         # Definir comportamiento según modo entrenamiento
         if is_training:
-            if event.get("event_type") not in ["flow", "http", "dns", "tls", "alert"]:
-                print(f"[SM] ℹ️ Evento ignorado (no es relevante para entrenamiento): {event.get('event_type')}")
+            # No filtrar ningún evento en modo entrenamiento, excepto estadísticas
+            if event.get("event_type") == "stats":
+                print("[SM] ℹ️ Evento ignorado (estadísticas no relevantes en entrenamiento)")
                 continue
-            event["anomaly"] = 0  # marcar explícitamente como tráfico normal
+            event["anomaly"] = 1 if training_label == "anomaly" else 0
         else:
             # Si no está en modo entrenamiento, solo aceptar eventos tipo "alert"
             if event.get("event_type") != "alert":
