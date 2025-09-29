@@ -75,10 +75,9 @@ def evaluar_modelo():
 
     df = pd.merge(model_output, ground_truth[["event_id", label_col]], on="event_id", how="inner")
     print(f"[DBG] 🔄 Eventos cruzados (merge): {df.shape[0]}")
+    df = df.rename(columns={label_col: "gt_label"})
     print("[DBG] Ejemplo después del merge:")
     print(df[["event_id", "gt_label"]].head())
-
-    df = df.rename(columns={label_col: "gt_label"})
 
     if df.empty:
         print("⚠ No hay intersección entre eventos del modelo y ground truth.")
