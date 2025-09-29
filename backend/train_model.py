@@ -71,6 +71,13 @@ df.fillna(0, inplace=True)
 
 df_original = df.copy()
 
+# [TM-DBG] Mostrar los primeros event_id antes de cualquier modificación
+if "event_id" in df.columns:
+    print("[TM-DBG] Primeros event_id antes del entrenamiento:")
+    print(df[["event_id"]].head(10))
+else:
+    print("[TM-DBG] ⚠ event_id no encontrado en df")
+
 label_column = "label_num"
 # Conjunto de características completo para predicción
 X_full_df = df.drop(columns=["timestamp", "src_ip", "dest_ip", "label_text", label_column], errors="ignore")
