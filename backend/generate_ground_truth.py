@@ -65,6 +65,12 @@ async def generate_ground_truth_from_mongo():
         return
 
     df = pd.DataFrame(events)
+    anomaly_count = df["training_label"].value_counts().get("anomaly", 0)
+    normal_count = df["training_label"].value_counts().get("normal", 0)
+    print("\n📊 Resumen del ground truth generado:")
+    print(f"- Total eventos: {len(df)}")
+    print(f"- Normales: {normal_count}")
+    print(f"- Anomalías: {anomaly_count}")
     df["event_id"] = df["_id"].astype(str)
     df = df.drop(columns=["_id"])  # Elimina la columna _id
     
