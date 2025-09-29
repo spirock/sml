@@ -77,7 +77,8 @@ async def generate_ground_truth_from_mongo():
 
     df["anomaly_score_g"] = df["training_label"].apply(assign_anomaly_score)
     df["prediction_g"] = df["training_label"].apply(prediction)
-
+    # NUEVO: columna ground truth explícita
+    df["gt_label"] = df["prediction_g"]  # 0=normal, 1=anomaly
     os.makedirs(os.path.dirname(GROUND_TRUTH_PATH), exist_ok=True)
     try:
         df.to_csv(GROUND_TRUTH_PATH, index=False)
