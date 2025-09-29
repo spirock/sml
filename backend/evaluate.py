@@ -90,7 +90,9 @@ def evaluar_modelo():
         df["prediction_bin"] = 0  # fallback si no venía la columna
 
     # Ground truth binaria
-    y_true = (df["gt_label"].astype(str).str.lower() == "anomaly").astype(int).values
+    y_true = df["gt_label"].astype(int).values
+    print("🔍 Conteo de etiquetas en ground truth:", pd.Series(y_true).value_counts().to_dict())
+    print("🔍 Conteo de predicciones en prediction_bin:", pd.Series(df['prediction_bin']).value_counts().to_dict())
 
     # Puntaje de normalidad del modelo (mayor = más normal)
     # Tras el merge puede duplicarse como *_x; priorizamos la del modelo
