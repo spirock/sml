@@ -76,8 +76,8 @@ def evaluar_modelo():
     df = pd.merge(model_output, ground_truth[["event_id", label_col]], on="event_id", how="inner")
     print(f"[DBG] 🔄 Eventos cruzados (merge): {df.shape[0]}")
     df = df.rename(columns={label_col: "gt_label"})
-    print("[DBG] Ejemplo después del merge:")
-    print(df[["event_id", "gt_label"]].head())
+    #print("[DBG] Ejemplo después del merge:")
+    #print(df[["event_id", "gt_label"]].head())
 
     if df.empty:
         print("⚠ No hay intersección entre eventos del modelo y ground truth.")
@@ -236,7 +236,10 @@ def analizar_falsos_negativos(df: pd.DataFrame, score_col: str):
     if dport_col:
         print("Distribución de Puertos:")
         try:
-            print(fn[dport_col].describe(percentiles=[0.5, 0.9, 0.99]))
+            if not fn.empty and dport_col in fn.columns and fn[dport_col].notna().any():
+                print(fn[dport_col].describe(percentiles=[0.5, 0.9, 0.99]))
+            else:
+                print("count: 0, mean: 0, std: 0, min: 0, 50%: 0, 90%: 0, 99%: 0, max: 0")
         except Exception:
             pass
 
@@ -259,7 +262,10 @@ def analizar_falsos_negativos(df: pd.DataFrame, score_col: str):
     if dport_col:
         print("Distribución de Puertos (FP):")
         try:
-            print(fp[dport_col].describe(percentiles=[0.5, 0.9, 0.99]))
+            if not fp.empty and dport_col in fp.columns and fp[dport_col].notna().any():
+                print(fp[dport_col].describe(percentiles=[0.5, 0.9, 0.99]))
+            else:
+                print("count: 0, mean: 0, std: 0, min: 0, 50%: 0, 90%: 0, 99%: 0, max: 0")
         except Exception:
             pass
 
