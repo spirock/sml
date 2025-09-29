@@ -91,19 +91,31 @@ async def get_logs(page: int = 1, limit: int = 100, dia: int = None, mes: int = 
         return {"error": str(e)}
     
 
-# Cargar el modelo entrenado de forma segura (no fallar si no existe)
-MODEL_PATH = IFOREST_MODEL
-model = None
-if os.path.exists(MODEL_PATH):
+@router.post("/predict")
+async def predict_anomaly(data: dict):
     try:
-        model = joblib.load(MODEL_PATH)
-        print("[ROUTER] ✅ Modelo cargado correctamente desde", MODEL_PATH)
-    except Exception as e:
-        # No queremos que un error al deserializar el modelo haga caer toda la API
-        print(f"[ROUTER] ⚠ Error cargando el modelo {MODEL_PATH}: {e}")
-else:
-    print(f"[ROUTER] ⚠ Modelo no encontrado en {MODEL_PATH}; la API de predicción quedará en modo degradado.")
+        # Cargar modelo dinámicamente al momento de predecir
+        MODEL_PATH = IFOREST_MODEL
+        if not os.path.exists(MODEL_PATH):
+            raise HTTPException(status_code=503, detail="Modelo no encontrado. Entrena antes de predecir.")
+        
+        try:
+            model = joblib.load(MODEL_PATH)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Error cargando el modelo: {e}")
 
+        df = pd.DataFrame([data])
+        df["src_ip"] = sum([int(num) << (8 * i) for i, num in enumerate(reversed(df["src_ip"][0].split('.')))])
+        df["dest_ip"] = sum([int(num) << (8 * i) for i, num in enumerate(reversed(df["dest_ip"][0].split('.')))])
+        df["proto"] = df["proto"].astype("category").cat.codes
+        df = (df - df.min()) / (df.max() - df.min())
+
+        prediction = model.predict(df)
+
+        return {"anomaly": bool(prediction[0] == -1)}
+
+    except Exception as e:
+        return {"error": str(e)}
 
 @router.post("/predict")
 async def predict_anomaly(data: dict):
