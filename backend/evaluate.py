@@ -67,11 +67,11 @@ def evaluar_modelo():
         print("❌ ground_truth.csv no contiene 'prediction_g', 'training_label' ni 'label'.")
         sys.exit(1)
 
-    print("[DBG] 🧾 Primeros event_id en model_output:")
-    print(model_output["event_id"].head())
+    #print("[DBG] 🧾 Primeros event_id en model_output:")
+    #print(model_output["event_id"].head())
 
-    print("[DBG] 🧾 Primeros event_id en ground_truth:")
-    print(ground_truth["event_id"].head())
+    #print("[DBG] 🧾 Primeros event_id en ground_truth:")
+    #print(ground_truth["event_id"].head())
 
     df = pd.merge(model_output, ground_truth[["event_id", label_col]], on="event_id", how="inner")
     print(f"[DBG] 🔄 Eventos cruzados (merge): {df.shape[0]}")
@@ -246,6 +246,28 @@ def analizar_falsos_negativos(df: pd.DataFrame, score_col: str):
         fn_sorted.to_csv("/app/models/fn_analysis.csv", index=False)
     except Exception as e:
         print(f"⚠ No se pudo guardar fn_analysis.csv: {e}")
+
+    # Falsos positivos: reales normales pero predichos como anomalía
+    fp_mask = (gt == 0) & (y_pred_thr == 1)
+    fp = df.loc[fp_mask]
+
+    print("\n🔍 Análisis Detallado de Falsos Positivos (umbral F1):")
+    proto_col = next((c for c in ["proto_x", "proto"] if c in fp.columns), None)
+    dport_col = next((c for c in ["dest_port_x", "dest_port"] if c in fp.columns), None)
+    if proto_col:
+        print("Top Protocolos (FP):", fp[proto_col].value_counts().head(3).to_dict())
+    if dport_col:
+        print("Distribución de Puertos (FP):")
+        try:
+            print(fp[dport_col].describe(percentiles=[0.5, 0.9, 0.99]))
+        except Exception:
+            pass
+
+    try:
+        fp_sorted = fp.sort_values(score_col, ascending=True).head(20)
+        fp_sorted.to_csv("/app/models/fp_analysis.csv", index=False)
+    except Exception as e:
+        print(f"⚠ No se pudo guardar fp_analysis.csv: {e}")
 
 
 if __name__ == "__main__":
