@@ -46,7 +46,7 @@ if not os.path.exists(DATA_PATH):
     print(f"[TM]❌ No se encontró el archivo {DATA_PATH}. Asegúrate de ejecutar el preprocesamiento antes.")
     exit(1)
 
-df = pd.read_csv(DATA_PATH)
+df = pd.read_csv(DATA_PATH, dtype={"event_id": str})
 
 def ip_to_numeric(ip):
     try:
