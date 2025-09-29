@@ -176,6 +176,8 @@ def preprocess_data(events):
     if "_id" in df.columns:
         df["_id"] = df["_id"].astype(str)
         df["event_id"] = df["_id"]
+        print("[ML] 🧾 Primeros event_id generados desde _id:")
+        print(df[["event_id", "_id"]].head(10))
     else:
         # Si no hay _id, intentamos construir un hash estable
         if "timestamp" in df.columns:
