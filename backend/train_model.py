@@ -81,7 +81,7 @@ else:
 
 label_column = "label_num"
 # Conjunto de características completo para predicción
-X_full_df = df.drop(columns=["timestamp", "src_ip", "dest_ip", "label_text", label_column], errors="ignore")
+X_full_df = df.drop(columns=["timestamp", "src_ip", "dest_ip", "label_text", label_column, "event_id"], errors="ignore")
 feature_cols = X_full_df.columns.tolist()
 # Nota: event_id no se incluye en el entrenamiento ya que representa un identificador único de MongoDB (ObjectId),
 # no aporta valor predictivo y podría sesgar el modelo. Se conserva solo en los resultados para trazabilidad.
@@ -171,6 +171,8 @@ try:
         if col in df_original.columns:
             result_df[col] = df_original[col]
     # Añadir resultados del modelo
+    if "event_id" in df_original.columns:
+        result_df["event_id"] = df_original["event_id"].astype(str)
     result_df["anomaly_score"] = scores
     result_df["prediction"] = predictions
     # Convertimos la predicción a binaria para consistencia (1 = anomalía, 0 = normal)
