@@ -62,9 +62,10 @@ if df.isnull().values.any():
     print("[TM] ⚠ Advertencia: Se encontraron valores NaN en los datos. Rellenando con ceros.")
     df.fillna(0, inplace=True)
 
-# Asegurar que todas las columnas sean numéricas
+# Asegurar que todas las columnas sean numéricas excepto event_id
 for col in df.columns:
-    df[col] = pd.to_numeric(df[col], errors="coerce")
+    if col != "event_id":
+        df[col] = pd.to_numeric(df[col], errors="coerce")
 
 # Si todavía hay NaN, reemplazarlos con ceros
 df.fillna(0, inplace=True)
