@@ -67,7 +67,17 @@ def evaluar_modelo():
         print("❌ ground_truth.csv no contiene 'prediction_g', 'training_label' ni 'label'.")
         sys.exit(1)
 
+    print("[DBG] 🧾 Primeros event_id en model_output:")
+    print(model_output["event_id"].head())
+
+    print("[DBG] 🧾 Primeros event_id en ground_truth:")
+    print(ground_truth["event_id"].head())
+
     df = pd.merge(model_output, ground_truth[["event_id", label_col]], on="event_id", how="inner")
+    print(f"[DBG] 🔄 Eventos cruzados (merge): {df.shape[0]}")
+    print("[DBG] Ejemplo después del merge:")
+    print(df[["event_id", "gt_label"]].head())
+
     df = df.rename(columns={label_col: "gt_label"})
 
     if df.empty:
