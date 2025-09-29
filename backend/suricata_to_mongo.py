@@ -128,8 +128,10 @@ async def main():
 
         # Definir comportamiento según modo entrenamiento
         if is_training:
-            # En modo entrenamiento aceptamos todos los tipos de eventos
-            pass
+            if event.get("event_type") not in ["flow", "http", "dns", "tls", "alert"]:
+                print(f"[SM] ℹ️ Evento ignorado (no es relevante para entrenamiento): {event.get('event_type')}")
+                continue
+            event["anomaly"] = 0  # marcar explícitamente como tráfico normal
         else:
             # Si no está en modo entrenamiento, solo aceptar eventos tipo "alert"
             if event.get("event_type") != "alert":
@@ -165,6 +167,7 @@ async def main():
             "training_mode": is_training,
             "training_label": training_label if is_training else "unknown",
             "training_session": session_hash if is_training else None,
+            "anomaly": 1 if training_label == "anomaly" else 0,
         }
 
 
