@@ -253,9 +253,12 @@ def preprocess_data(events):
         "conn_velocity": 0.0, "proto_pkt_mean": 0.0, "proto_pkt_std": 0.0,
         "proto_ports": 0.0, "pkt_anomaly": 0, "anomaly": -1
     }
+    ##revisa aqui que esta imprimiendo
     for col, default in defaults.items():
         df = ensure_column(df, col, default)
-    df = ensure_column(df, "event_id", "")
+        if col == "event_id":
+            print("[ML-DBG] after defaults - sample event_id/_id:")
+            print(df[["event_id", "_id"]].head(5))
     df = ensure_column(df, "proto", 0)
     df = ensure_column(df, "src_port", 0)
     df = ensure_column(df, "dest_port", 0)
@@ -263,6 +266,9 @@ def preprocess_data(events):
     df = ensure_column(df, "dest_ip", "0.0.0.0")
 
     df = df[[c for c in selected_columns if c in df.columns]].copy()
+    print("[ML-DBG] selected columns:", df.columns.tolist())
+    print("[ML-DBG] sample event_id before IP->int:")
+    print(df[["event_id"]].head(5))
 
     # Convertir direcciones IP a valores numéricos usando ip_to_int()
     df["src_ip"] = df["src_ip"].apply(ip_to_int)
@@ -285,6 +291,8 @@ def preprocess_data(events):
 
     # Combinar con columnas no numéricas (por ejemplo event_id si existe)
     df = pd.concat([df_normalized, df.drop(columns=numeric_cols)], axis=1)
+    print("[ML-DBG] event_id presentes en df.drop(columns=numeric_cols).head():")
+    print(df.drop(columns=numeric_cols)[["event_id"]].head(5))
 
     return df
 
