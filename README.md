@@ -57,3 +57,21 @@ El objetivo principal es automatizar el proceso de creación y optimización de 
 ---
 
 ## Flujo de Funcionamiento
+Suricata → Logs (eve.json) → API FastAPI → Base de Datos → Modelo ML → Generación de Reglas → Suricata
+
+
+---
+
+## Estado del Proyecto
+Proyecto en desarrollo como parte de investigación académica en sistemas de detección de intrusiones basados en Machine Learning.
+
+---
+
+## Futuras Mejoras
+- Implementación de redes neuronales para clasificación avanzada.
+- Dashboard de visualización de amenazas en tiempo real.
+- Sistema de optimización automática de reglas basado en feedback.
+- Integración con plataformas SIEM.
+
+---
+
